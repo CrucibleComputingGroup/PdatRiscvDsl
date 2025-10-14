@@ -1,0 +1,107 @@
+==================
+Simple require rule
+==================
+
+require RV32I
+
+---
+
+(source_file
+  (require_rule
+    extension: (identifier)))
+
+==================
+Require with register constraint
+==================
+
+require RV32I
+require_registers x0-x15
+
+---
+
+(source_file
+  (require_rule
+    extension: (identifier))
+  (require_registers_rule
+    range: (register_range
+      start: (register_name)
+      end: (register_name))))
+
+==================
+Instruction without constraints
+==================
+
+instruction MUL
+instruction DIV
+
+---
+
+(source_file
+  (instruction_rule
+    name: (identifier))
+  (instruction_rule
+    name: (identifier)))
+
+==================
+Instruction with field constraints
+==================
+
+instruction ADD { rd = x0, rs1 = x1 }
+
+---
+
+(source_file
+  (instruction_rule
+    name: (identifier)
+    constraints: (field_constraints
+      (field_constraint
+        field: (identifier)
+        value: (register_name))
+      (field_constraint
+        field: (identifier)
+        value: (register_name)))))
+
+==================
+Pattern rule
+==================
+
+pattern 0x02000033 mask 0xFE00707F
+
+---
+
+(source_file
+  (pattern_rule
+    pattern: (number)
+    mask: (number)))
+
+==================
+Complete example with comments
+==================
+
+# Example: RV32I without multiply
+require RV32I
+require_registers x0-x15
+
+# Outlaw multiplication
+instruction MUL
+instruction MULH
+
+# Low-level pattern
+pattern 0x02000033 mask 0xFE00707F
+
+---
+
+(source_file
+  (require_rule
+    extension: (identifier))
+  (require_registers_rule
+    range: (register_range
+      start: (register_name)
+      end: (register_name)))
+  (instruction_rule
+    name: (identifier))
+  (instruction_rule
+    name: (identifier))
+  (pattern_rule
+    pattern: (number)
+    mask: (number)))

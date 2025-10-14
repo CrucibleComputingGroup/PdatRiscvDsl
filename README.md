@@ -181,9 +181,18 @@ PdatDsl/
 │   ├── example_16reg.dsl
 │   ├── example_outlawed.dsl
 │   └── rv32im.dsl
-├── tests/              # Unit tests
-├── pyproject.toml      # Package configuration
-└── README.md           # This file
+├── tests/                      # Unit tests
+├── editors/                    # Editor support
+│   ├── vscode/                # VS Code extension
+│   │   ├── pdat-dsl.tmLanguage.json
+│   │   └── package.json
+│   └── README.md              # Editor setup instructions
+├── tree-sitter-pdat-dsl/      # Tree-sitter grammar
+│   ├── grammar.js
+│   ├── queries/highlights.scm
+│   └── test/corpus/
+├── pyproject.toml              # Package configuration
+└── README.md                   # This file
 ```
 
 ## Architecture
@@ -236,6 +245,16 @@ The complete workflow for finding signal equivalences using constrained-random s
 
 ### ISA Documentation
 Use DSL files as machine-readable documentation of your processor's supported ISA subset.
+
+## Editor Support
+
+Syntax highlighting is available for multiple editors:
+
+- **VS Code**: See `editors/vscode/` - TextMate grammar
+- **Neovim/Helix/Emacs**: See `tree-sitter-pdat-dsl/` - Tree-sitter grammar
+- **Vim**: See `editors/README.md` for syntax file
+
+Installation instructions are in `editors/README.md`.
 
 ## Contributing
 

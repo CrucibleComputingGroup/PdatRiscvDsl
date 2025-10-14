@@ -1,0 +1,42 @@
+{
+  "name": "pdat-dsl",
+  "displayName": "PDAT DSL",
+  "description": "Syntax highlighting for PDAT DSL (RISC-V ISA subset specification language)",
+  "version": "0.1.0",
+  "publisher": "nathan-bleier",
+  "license": "CC-BY-NC-SA-4.0",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "risc-v",
+    "isa",
+    "dsl",
+    "hardware",
+    "verification"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "pdat-dsl",
+        "aliases": ["PDAT DSL", "pdat-dsl"],
+        "extensions": [".dsl"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "pdat-dsl",
+        "scopeName": "source.pdat-dsl",
+        "path": "./pdat-dsl.tmLanguage.json"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/PdatDsl"
+  }
+}

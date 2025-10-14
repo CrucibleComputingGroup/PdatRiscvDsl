@@ -1,0 +1,134 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "PDAT DSL",
+  "scopeName": "source.pdat-dsl",
+  "fileTypes": ["dsl"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#require-rule" },
+    { "include": "#require-registers-rule" },
+    { "include": "#instruction-rule" },
+    { "include": "#pattern-rule" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.pdat-dsl",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "require-rule": {
+      "patterns": [
+        {
+          "match": "\\b(require)\\s+([A-Za-z0-9_]+)",
+          "captures": {
+            "1": { "name": "keyword.control.pdat-dsl" },
+            "2": { "name": "entity.name.type.extension.pdat-dsl" }
+          }
+        }
+      ]
+    },
+    "require-registers-rule": {
+      "patterns": [
+        {
+          "match": "\\b(require_registers)\\s+(x[0-9]{1,2}|[0-9]+)-(x[0-9]{1,2}|[0-9]+)",
+          "captures": {
+            "1": { "name": "keyword.control.pdat-dsl" },
+            "2": { "name": "variable.parameter.register.pdat-dsl" },
+            "3": { "name": "variable.parameter.register.pdat-dsl" }
+          }
+        }
+      ]
+    },
+    "instruction-rule": {
+      "patterns": [
+        {
+          "begin": "\\b(instruction)\\s+([A-Z][A-Z0-9_]*)",
+          "end": "(?<=\\})|$",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.pdat-dsl" },
+            "2": { "name": "entity.name.function.instruction.pdat-dsl" }
+          },
+          "patterns": [
+            { "include": "#field-constraints" }
+          ]
+        }
+      ]
+    },
+    "pattern-rule": {
+      "patterns": [
+        {
+          "match": "\\b(pattern)\\s+(0x[0-9a-fA-F]+|0b[01]+|[0-9]+)\\s+(mask)\\s+(0x[0-9a-fA-F]+|0b[01]+|[0-9]+)",
+          "captures": {
+            "1": { "name": "keyword.control.pdat-dsl" },
+            "2": { "name": "constant.numeric.hex.pdat-dsl" },
+            "3": { "name": "keyword.control.pdat-dsl" },
+            "4": { "name": "constant.numeric.hex.pdat-dsl" }
+          }
+        }
+      ]
+    },
+    "field-constraints": {
+      "patterns": [
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": { "0": { "name": "punctuation.definition.block.begin.pdat-dsl" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.block.end.pdat-dsl" } },
+          "patterns": [
+            { "include": "#field-constraint" }
+          ]
+        }
+      ]
+    },
+    "field-constraint": {
+      "patterns": [
+        {
+          "match": "\\b([a-z][a-z0-9_]*)\\s*=\\s*(\\*|x|_|x[0-9]{1,2}|0x[0-9a-fA-F]+|0b[01]+|[0-9]+|[A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "variable.other.field.pdat-dsl" },
+            "2": { "name": "constant.other.value.pdat-dsl" }
+          }
+        },
+        {
+          "name": "punctuation.separator.comma.pdat-dsl",
+          "match": ","
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.pdat-dsl",
+          "match": "\\b(require|require_registers|instruction|pattern|mask)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.pdat-dsl",
+          "match": "\\b0[xX][0-9a-fA-F_]+\\b"
+        },
+        {
+          "name": "constant.numeric.binary.pdat-dsl",
+          "match": "\\b0[bB][01_]+\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.pdat-dsl",
+          "match": "\\b[0-9][0-9_]*\\b"
+        }
+      ]
+    },
+    "registers": {
+      "patterns": [
+        {
+          "name": "variable.parameter.register.pdat-dsl",
+          "match": "\\b[xX][0-9]{1,2}\\b"
+        }
+      ]
+    }
+  }
+}

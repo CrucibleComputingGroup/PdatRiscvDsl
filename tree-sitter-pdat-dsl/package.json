@@ -1,0 +1,30 @@
+{
+  "name": "tree-sitter-pdat-dsl",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for PDAT DSL (RISC-V ISA subset specification language)",
+  "main": "bindings/node",
+  "keywords": [
+    "parser",
+    "tree-sitter",
+    "pdat",
+    "dsl",
+    "risc-v"
+  ],
+  "author": "Nathan Bleier <nbleier@umich.edu>",
+  "license": "CC-BY-NC-SA-4.0",
+  "dependencies": {
+    "nan": "^2.17.0"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.20.8"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.pdat-dsl",
+      "file-types": [
+        "dsl"
+      ],
+      "injection-regex": "pdat-dsl"
+    }
+  ]
+}
