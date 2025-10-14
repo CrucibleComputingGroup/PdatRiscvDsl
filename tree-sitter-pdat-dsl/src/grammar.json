@@ -1,5 +1,6 @@
 {
   "name": "pdat_dsl",
+  "word": "identifier",
   "rules": {
     "source_file": {
       "type": "REPEAT",

@@ -8,6 +8,10 @@
 module.exports = grammar({
   name: 'pdat_dsl',
 
+  // Target ABI version 14 for compatibility
+  // Remove this line if using tree-sitter-cli >= 0.23.0
+  word: $ => $.identifier,
+
   extras: $ => [
     /\s/,           // Whitespace
     $.comment,      // Comments
