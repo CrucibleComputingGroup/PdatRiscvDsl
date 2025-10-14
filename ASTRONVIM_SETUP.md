@@ -11,33 +11,36 @@ Your AstroNvim config has been updated to support PDAT DSL syntax highlighting.
 2. **`~/.config/nvim/lua/polish.lua`**
    - Added filetype detection: `.dsl` files → `pdat-dsl` filetype
 
-## Installation Steps
+## Installation Steps (COMPLETED)
 
-### 1. Build the Tree-sitter parser (already done)
+The parser has been **manually installed** to avoid ABI version conflicts.
 
-The parser has been generated in `tree-sitter-pdat-dsl/src/parser.c`.
+### Installation Location
 
-### 2. Install in Neovim
+- **Parser**: `~/.local/share/nvim/site/parser/pdat_dsl.so` (ABI v14)
+- **Queries**: `~/.local/share/nvim/site/queries/pdat_dsl/highlights.scm`
 
-Open Neovim and run:
+### Manual Installation Command (if needed)
 
-```vim
-:TSInstall pdat_dsl
+If you need to reinstall or update:
+
+```bash
+cd /home/nbleier/PdatProject/PdatDsl
+
+# Compile parser
+gcc -o ~/.local/share/nvim/site/parser/pdat_dsl.so \
+    -shared tree-sitter-pdat-dsl/src/parser.c \
+    -I./tree-sitter-pdat-dsl/src -Os -fPIC
+
+# Copy queries
+mkdir -p ~/.local/share/nvim/site/queries/pdat_dsl
+cp tree-sitter-pdat-dsl/queries/highlights.scm \
+   ~/.local/share/nvim/site/queries/pdat_dsl/
 ```
 
-This will compile the parser from your local directory.
+### Verify Installation
 
-### 3. Verify Installation
-
-```vim
-:TSInstallInfo
-```
-
-Look for `pdat_dsl` in the list of installed parsers.
-
-### 4. Test Syntax Highlighting
-
-Open any `.dsl` file:
+Restart Neovim and open any `.dsl` file:
 
 ```bash
 nvim examples/example_16reg.dsl
@@ -49,6 +52,13 @@ You should see:
 - Register names (x0, x15) highlighted
 - Comments in different color
 - Numbers with appropriate highlighting
+
+Check that Tree-sitter is active:
+```vim
+:lua =vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()]
+```
+
+Should return a table (not nil) when viewing a `.dsl` file.
 
 ## Troubleshooting
 

@@ -1,9 +1,9 @@
 node_modules/
 build/
-src/parser.c
+# Keep src/parser.c (pre-generated for ABI v14)
+# src/parser.c
 src/tree_sitter/
 *.o
 *.so
 *.dylib
 *.a
-package-lock.json
