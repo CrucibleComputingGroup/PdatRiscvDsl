@@ -115,10 +115,8 @@ module {module_name} (
   input logic        rst_ni,
   input logic        instr_valid_i,
   input logic [31:0] instr_rdata_i,
-  input logic        instr_is_compressed_i,
-  // Decoder outputs - for direct constraints on execution units
-  input logic        mult_en_dec_i,
-  input logic        div_en_dec_i"""
+  input logic        instr_is_compressed_i
+);
 
     if needs_operands:
         sv_code += """,
@@ -133,10 +131,6 @@ module {module_name} (
     # Group by width (assume all 32-bit for now, can add 16-bit later)
     patterns_32 = [(p, m, d) for p, m, d in patterns if m <= 0xFFFFFFFF]
 
-    # Check if we have MUL/DIV instructions in the outlawed list
-    has_mul = any('MUL' in desc for _, _, desc in patterns_32)
-    has_div = any('DIV' in desc or 'REM' in desc for _, _, desc in patterns_32)
-
     if patterns_32:
         sv_code += "  // 32-bit outlawed instruction patterns\n"
         sv_code += "  // Using combinational 'assume' so ABC can use them as don't-care conditions\n"
@@ -150,19 +144,6 @@ module {module_name} (
             sv_code += f"      assume ((instr_rdata_i & 32'h{mask:08x}) != 32'h{pattern:08x});\n"
             sv_code += f"    end\n"
             sv_code += f"  end\n\n"
-
-    # Add direct assumptions on decoder outputs for better optimization
-    if has_mul or has_div:
-        sv_code += "  // Direct assumptions on decoder outputs for better ABC optimization\n"
-        sv_code += "  // These help ABC directly see that execution units are disabled\n"
-        if has_mul:
-            sv_code += "  always_comb begin\n"
-            sv_code += "    assume (mult_en_dec_i == 1'b0);  // Multiplier never enabled\n"
-            sv_code += "  end\n\n"
-        if has_div:
-            sv_code += "  always_comb begin\n"
-            sv_code += "    assume (div_en_dec_i == 1'b0);   // Divider never enabled\n"
-            sv_code += "  end\n\n"
 
     if not patterns_32:
         sv_code += "  // No outlawed instruction patterns specified\n\n"
@@ -384,10 +365,6 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         if not required_extensions:
             code += "  // No instruction constraints specified\n\n"
         return code
-
-    # Check if we have MUL/DIV instructions
-    has_mul = any('MUL' in desc for _, _, desc in patterns)
-    has_div = any('DIV' in desc or 'REM' in desc for _, _, desc in patterns)
 
     code += "  // Instruction encoding constraints (unconditional form for ABC)\n"
     code += "  // When out of reset and instruction is uncompressed, these patterns don't occur\n"
