@@ -17,8 +17,8 @@ Grammar:
 
 import re
 import sys
-from dataclasses import dataclass
-from typing import List, Optional, Dict, Union
+from dataclasses import dataclass, field as dataclass_field
+from typing import List, Optional, Dict, Union, Set
 from enum import Enum
 
 # ============================================================================
@@ -37,13 +37,18 @@ class TokenType(Enum):
     IDENTIFIER = "identifier"
     NUMBER = "number"
     WILDCARD = "wildcard"
+    DTYPE = "dtype"  # Data type token (i8, u16, etc.)
 
     # Symbols
     LBRACE = "{"
     RBRACE = "}"
+    LPAREN = "("
+    RPAREN = ")"
     COMMA = ","
     EQUALS = "="
     DASH = "-"
+    PIPE = "|"
+    TILDE = "~"
 
     # Other
     COMMENT = "comment"
@@ -61,11 +66,86 @@ class Token:
 # AST Nodes
 # ============================================================================
 
+@dataclass(frozen=True)
+class DataType:
+    """Represents a data type specification (e.g., i8, u16, i32 | u32)"""
+    width: int  # Bit width: 8, 16, 32, or 64
+    signed: bool  # True for signed (i*), False for unsigned (u*)
+
+    def __str__(self):
+        prefix = 'i' if self.signed else 'u'
+        return f"{prefix}{self.width}"
+
+    def __repr__(self):
+        return f"DataType({self})"
+
+    @staticmethod
+    def from_string(s: str) -> 'DataType':
+        """Parse a data type string like 'i8', 'u16', etc."""
+        if not s or len(s) < 2:
+            raise ValueError(f"Invalid data type: {s}")
+
+        prefix = s[0].lower()
+        if prefix not in ('i', 'u'):
+            raise ValueError(f"Invalid data type prefix: {prefix} (expected 'i' or 'u')")
+
+        try:
+            width = int(s[1:])
+        except ValueError:
+            raise ValueError(f"Invalid data type width: {s[1:]}")
+
+        if width not in (8, 16, 32, 64):
+            raise ValueError(f"Invalid data type width: {width} (expected 8, 16, 32, or 64)")
+
+        return DataType(width=width, signed=(prefix == 'i'))
+
+@dataclass
+class DataTypeSet:
+    """Represents a type expression: a set of data types with optional negation prefix.
+
+    Syntax:
+    - Simple: i8 | u8 | i16
+    - Negated: ~(i16 | u16) or ~i8
+
+    Note: The negation (~) is NOT a general operator - it's a type expression prefix
+    that can only appear once at the very beginning, not nested or repeated.
+    This is a domain-specific construct, not standard boolean negation.
+
+    Semantics (consistent with instruction outlawing):
+    - Without ~: "outlaw instructions using ANY of these types"
+      Example: i8 | u8 means "forbid when using i8 OR u8"
+
+    - With ~: "outlaw instructions using NONE of these types" = "allow ONLY these types"
+      Example: ~(i16 | u16) means "forbid when NOT using i16 or u16" = "require i16 or u16"
+
+    The negation inverts the constraint, allowing positive specifications within
+    a negative (outlawing) framework.
+    """
+    types: Set[DataType] = dataclass_field(default_factory=set)
+    negated: bool = False  # If True, entire expression is negated (~prefix)
+
+    def add(self, dtype: DataType):
+        """Add a data type to the set"""
+        self.types.add(dtype)
+
+    def __str__(self):
+        type_str = " | ".join(str(t) for t in sorted(self.types, key=lambda t: (t.width, not t.signed)))
+        if self.negated:
+            # Add parentheses if multiple types
+            if len(self.types) > 1:
+                return f"~({type_str})"
+            else:
+                return f"~{type_str}"
+        return type_str
+
+    def __repr__(self):
+        return f"DataTypeSet({self})"
+
 @dataclass
 class FieldConstraint:
-    """Represents a field constraint like 'rd = x5' or 'opcode = 0x33'"""
+    """Represents a field constraint like 'rd = x5' or 'opcode = 0x33' or 'dtype = i8 | u8'"""
     field_name: str
-    field_value: Union[str, int]  # Can be wildcard "*", register "x5", or number
+    field_value: Union[str, int, DataTypeSet]  # Can be wildcard "*", register "x5", number, or data type set
 
 @dataclass
 class RequireRule:
@@ -206,8 +286,23 @@ class Lexer:
             return Token(TokenType.PATTERN, ident, start_line, start_col)
         elif ident == "mask":
             return Token(TokenType.MASK, ident, start_line, start_col)
+        # Check if it's a data type (i8, u16, i32, u64, etc.)
+        elif self._is_data_type(ident):
+            return Token(TokenType.DTYPE, ident, start_line, start_col)
         else:
             return Token(TokenType.IDENTIFIER, ident, start_line, start_col)
+
+    def _is_data_type(self, ident: str) -> bool:
+        """Check if identifier is a data type like i8, u16, i32, u64"""
+        if len(ident) < 2:
+            return False
+        if ident[0] not in ('i', 'u'):
+            return False
+        try:
+            width = int(ident[1:])
+            return width in (8, 16, 32, 64)
+        except ValueError:
+            return False
 
     def tokenize(self) -> List[Token]:
         """Tokenize the entire input"""
@@ -245,6 +340,16 @@ class Lexer:
                 self.advance()
                 continue
 
+            if ch == '(':
+                tokens.append(Token(TokenType.LPAREN, ch, self.line, self.column))
+                self.advance()
+                continue
+
+            if ch == ')':
+                tokens.append(Token(TokenType.RPAREN, ch, self.line, self.column))
+                self.advance()
+                continue
+
             if ch == ',':
                 tokens.append(Token(TokenType.COMMA, ch, self.line, self.column))
                 self.advance()
@@ -257,6 +362,16 @@ class Lexer:
 
             if ch == '-':
                 tokens.append(Token(TokenType.DASH, ch, self.line, self.column))
+                self.advance()
+                continue
+
+            if ch == '|':
+                tokens.append(Token(TokenType.PIPE, ch, self.line, self.column))
+                self.advance()
+                continue
+
+            if ch == '~':
+                tokens.append(Token(TokenType.TILDE, ch, self.line, self.column))
                 self.advance()
                 continue
 
@@ -446,23 +561,115 @@ class Parser:
         return constraints
 
     def parse_field_constraint(self) -> FieldConstraint:
-        """Parse: field_name = field_value"""
+        """Parse: field_name = field_value
+
+        field_value can be:
+        - wildcard: *, x, _
+        - number: 0x33, 42
+        - register: x5 (as identifier)
+        - data type: i8, u16
+        - data type set: i8 | u8 | i16
+        - negated type: ~i16 or ~(i16 | u16)
+        """
         field_name = self.expect(TokenType.IDENTIFIER)
         self.expect(TokenType.EQUALS)
 
-        # Parse field value (wildcard, number, or identifier)
+        # Parse field value (wildcard, number, identifier, or data type set)
         value_tok = self.peek()
 
         if value_tok.type == TokenType.WILDCARD:
             value = self.advance().value
         elif value_tok.type == TokenType.NUMBER:
             value = self.advance().value
+        elif value_tok.type == TokenType.DTYPE or value_tok.type == TokenType.TILDE:
+            # Parse data type or data type set (i8 | u8 | i16 | ~i16 | ~(i16 | u16))
+            value = self.parse_data_type_set()
         elif value_tok.type == TokenType.IDENTIFIER:
+            # Check if this looks like a dtype but isn't valid (e.g., i7, u3)
+            # This provides better error messages for invalid data types
+            if self._looks_like_invalid_dtype(value_tok.value):
+                self.error(f"Invalid data type '{value_tok.value}'. Valid types are: i8, u8, i16, u16, i32, u32, i64, u64")
             value = self.advance().value
         else:
             self.error(f"Expected field value, got {value_tok.type}")
 
         return FieldConstraint(field_name.value, value)
+
+    def _looks_like_invalid_dtype(self, ident: str) -> bool:
+        """Check if identifier looks like a data type but isn't valid"""
+        if len(ident) < 2:
+            return False
+        if ident[0] not in ('i', 'u'):
+            return False
+        # It starts with i or u, check if rest looks like a number
+        try:
+            int(ident[1:])
+            return True  # Looks like a dtype (e.g., i7, u3)
+        except ValueError:
+            return False
+
+    def parse_data_type_set(self) -> DataTypeSet:
+        """Parse a type expression: data types with optional negation prefix.
+
+        Grammar:
+        type_expr = ["~"] ["("] type_list [")"]
+        type_list = DTYPE { "|" DTYPE }
+
+        Valid examples:
+        - i8
+        - i8 | u8
+        - ~i16
+        - ~(i16 | u16)
+
+        Invalid examples:
+        - ~~i8           (double negation not supported)
+        - i8 | ~u8       (negation only at start)
+        - ~i8 | ~u8      (negation applies to whole expression)
+
+        Note: The ~ is a type expression prefix, not a composable operator.
+        It can only appear once at the very beginning of the expression.
+
+        Semantics:
+        - Without ~: "outlaw these types" (i8 | u8 = forbid i8 or u8)
+        - With ~: "outlaw everything except these" (~(i16 | u16) = allow only i16 or u16)
+        """
+        negated = False
+        dtype_set = DataTypeSet()
+
+        # Check for negation operator
+        if self.peek() and self.peek().type == TokenType.TILDE:
+            self.advance()  # consume ~
+            negated = True
+
+            # Check if parentheses follow (optional for single type, required for multiple)
+            has_parens = self.peek() and self.peek().type == TokenType.LPAREN
+            if has_parens:
+                self.advance()  # consume (
+
+        # Parse first data type
+        dtype_tok = self.expect(TokenType.DTYPE)
+        try:
+            dtype = DataType.from_string(dtype_tok.value)
+            dtype_set.add(dtype)
+        except ValueError as e:
+            self.error(f"Invalid data type '{dtype_tok.value}': {e}")
+
+        # Parse additional data types separated by |
+        while self.peek() and self.peek().type == TokenType.PIPE:
+            self.advance()  # skip pipe
+            dtype_tok = self.expect(TokenType.DTYPE)
+            try:
+                dtype = DataType.from_string(dtype_tok.value)
+                dtype_set.add(dtype)
+            except ValueError as e:
+                self.error(f"Invalid data type '{dtype_tok.value}': {e}")
+
+        # If we had opening paren for negation, expect closing paren
+        if negated and 'has_parens' in locals() and has_parens:
+            self.expect(TokenType.RPAREN)
+
+        dtype_set.negated = negated
+        return dtype_set
 
 # ============================================================================
 # Main / Testing
@@ -520,6 +727,14 @@ DSL Syntax:
 
         # Outlaw MUL with specific register constraint
         instruction MUL { rd = x0 }
+
+        # Data type constraints (negative semantics)
+        instruction MUL { dtype = i16 }
+        instruction ADD { rs1_dtype = i8 | u8, rs2_dtype = i8 }
+
+        # Negated data type constraints (allow only these types)
+        instruction DIV { dtype = ~(i16 | u16) }
+        instruction DIVU { dtype = ~i32 }
 
         # Low-level pattern
         pattern 0x02000033 mask 0xFE00707F
