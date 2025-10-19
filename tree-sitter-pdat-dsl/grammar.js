@@ -74,9 +74,20 @@ module.exports = grammar({
         $.wildcard,
         $.number,
         $.register_name,
-        $.identifier
+        $.identifier,
+        $.data_type_set
       ))
     ),
+
+    data_type_set: $ => seq(
+      optional('~'),
+      optional('('),
+      $.data_type,
+      repeat(seq('|', $.data_type)),
+      optional(')')
+    ),
+
+    data_type: $ => /[iu](8|16|32|64)/,
 
     // Terminals
     identifier: $ => /[A-Za-z_][A-Za-z0-9_]*/,
