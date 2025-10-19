@@ -7,3 +7,5 @@ src/tree_sitter/
 *.so
 *.dylib
 *.a
+*.c
+package_lock.json

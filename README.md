@@ -103,6 +103,18 @@ instruction DIV
 # Outlaw instructions with specific field constraints
 instruction ADD { rd = x0 }
 
+# Data type constraints (instruction-level)
+instruction MUL { dtype = i16 }
+
+# Data type constraints (per-operand)
+instruction MULHU { rd_dtype = u16, rs1_dtype = u16, rs2_dtype = u16 }
+
+# Multiple allowed types
+instruction DIV { dtype = i8 | i16 }
+
+# Combined register and data type constraints
+instruction MUL { rd = x5, rs1_dtype = i16, rs2_dtype = i16 }
+
 # Low-level pattern matching
 pattern 0x02000033 mask 0xFE00707F
 ```
@@ -121,7 +133,9 @@ pattern_rule = "pattern" hex_value "mask" hex_value
 register_range = register_name "-" register_name | number "-" number
 field_constraints = "{" field_constraint { "," field_constraint } "}"
 field_constraint = field_name "=" field_value
-field_value = wildcard | number | register_name
+field_value = wildcard | number | register_name | data_type_set
+data_type_set = data_type { "|" data_type }
+data_type = ("i" | "u") ("8" | "16" | "32" | "64")
 ```
 
 ### Keywords
@@ -130,6 +144,113 @@ field_value = wildcard | number | register_name
 - `require_registers` - Limit which registers can be used
 - `instruction` - Outlaw a specific instruction by name
 - `pattern` / `mask` - Outlaw instructions matching a specific bit pattern
+
+### Data Type Constraints
+
+Data type constraints allow you to specify the width and signedness of operands used by instructions. These constraints follow the DSL's "outlawing" semantics but support negation to express positive requirements.
+
+**Use cases:**
+- **Hardware optimization**: Indicate that certain instructions only use narrow data widths (e.g., 8-bit or 16-bit), allowing synthesis tools to optimize away unused bits
+- **Formal verification**: Generate assertions that operands fall within specified ranges
+- **Power analysis**: Model data switching activity based on actual data widths used
+- **Documentation**: Capture C-level data type semantics in hardware specifications
+
+#### Data Type Syntax
+
+Data types specify both width and signedness:
+
+- **Signed types**: `i8`, `i16`, `i32`, `i64` (sign-extended to full register width)
+- **Unsigned types**: `u8`, `u16`, `u32`, `u64` (zero-extended to full register width)
+
+#### Negation Operator
+
+The negation operator `~` is a **type expression prefix** (not a general operator) that inverts the constraint:
+
+- **Without `~`**: Outlaw instructions using these types (negative constraint)
+- **With `~`**: Outlaw instructions NOT using these types (positive constraint)
+
+**Important**: The `~` can only appear once at the very beginning of a type expression, not nested or repeated.
+
+#### Constraint Styles
+
+**1. Negative constraints** (forbid specific types):
+```
+instruction MUL { dtype = i16 }           # Forbid MUL when using i16
+instruction DIV { dtype = i8 | u8 }       # Forbid DIV when using i8 OR u8
+```
+
+**2. Positive constraints** (allow only specific types):
+```
+instruction MUL { dtype = ~i16 }          # Allow only i16 (forbid all others)
+instruction DIV { dtype = ~(i8 | u8) }    # Allow only i8 or u8
+```
+
+**3. Per-operand constraints** (fine-grained control):
+```
+instruction MUL { rd_dtype = ~i16, rs1_dtype = ~i16, rs2_dtype = ~i16 }
+instruction MULHU { rd_dtype = ~u32, rs1_dtype = ~u16, rs2_dtype = ~u16 }
+```
+
+**4. Combined with register constraints**:
+```
+instruction MUL { rd = x5, rs1_dtype = ~i8, rs2_dtype = ~(i8 | u8) }
+```
+
+#### Data Type Semantics
+
+| Type | Width | Range | Extension |
+|------|-------|-------|-----------|
+| `i8` | 8-bit | -128 to 127 | Sign-extended |
+| `u8` | 8-bit | 0 to 255 | Zero-extended |
+| `i16` | 16-bit | -32768 to 32767 | Sign-extended |
+| `u16` | 16-bit | 0 to 65535 | Zero-extended |
+| `i32` | 32-bit | Full register (RV32) | N/A |
+| `u32` | 32-bit | Full register (RV32) | N/A |
+| `i64` | 64-bit | Full register (RV64) | N/A |
+| `u64` | 64-bit | Full register (RV64) | N/A |
+
+#### Type Expression Examples
+
+```
+# Negative constraints (outlaw specific types)
+dtype = i8              # Forbid i8
+dtype = i8 | u8         # Forbid i8 OR u8
+dtype = i8 | i16        # Forbid i8 and i16 (must include all widths up to max)
+
+# Positive constraints (allow only specific types)
+dtype = ~i8             # Allow only i8
+dtype = ~(i8 | u8)      # Allow only i8 or u8
+dtype = ~(u8 | u16)     # Allow only u8 or u16 (must include all widths down to min)
+
+# Invalid syntax (negation must be at start)
+dtype = ~~i8            # Error: double negation
+dtype = i8 | ~u8        # Error: negation in middle
+dtype = ~i8 | ~u8       # Error: multiple negations
+
+# Invalid semantics (creates gaps or ambiguity)
+dtype = i8 | i32        # Error: missing i16 (gap)
+dtype = ~(u16 | u32)    # Error: missing u8 (can't distinguish u8 from u16 when < 256)
+dtype = u8 | u32        # Error: forbidding u8 requires forbidding u16 too
+```
+
+#### Validation Rules
+
+**The key insight:** You cannot distinguish u8 from u16 when the value is < 256 using only bit patterns.
+
+For a given signedness (signed or unsigned):
+
+1. **Forbid constraints** (without `~`): When forbidding narrow types, must also forbid all wider types
+   - Valid: `u8 | u16` (forbid up to u16, allow u32+)
+   - Invalid: `u8 | u32` (missing u16 creates ambiguity)
+
+2. **Allow constraints** (with `~`): When allowing wide types, must also allow all narrower types
+   - Valid: `~(u8 | u16)` (allow u8 and u16)
+   - Invalid: `~(u16 | u32)` (missing u8 - can't enforce!)
+
+3. **No gaps allowed** within a signedness category
+   - Valid: `i8 | i16 | i32`
+   - Invalid: `i8 | i32` (missing i16)
+```
 
 ## Examples
 
@@ -163,6 +284,37 @@ instruction MULHSU
 instruction MULHU
 ```
 
+### Example 3: Data type constraints for narrow arithmetic
+
+```
+require RV32I
+require RV32M
+
+# Negative constraint: forbid MUL when using 16-bit signed
+instruction MUL { dtype = i16 }
+
+# Positive constraint: allow MUL ONLY with 16-bit signed (forbid all others)
+instruction MUL { dtype = ~i16 }
+
+# Allow MULHU only with unsigned 16-bit operands
+instruction MULHU { rd_dtype = ~u16, rs1_dtype = ~u16, rs2_dtype = ~u16 }
+
+# Mixed signedness: allow only these specific types
+# rd and rs1 must be signed 8-bit, rs2 can be signed or unsigned 8-bit
+instruction MULHSU { rd_dtype = ~i8, rs1_dtype = ~i8, rs2_dtype = ~(i8 | u8) }
+
+# Forbid DIV when using 8-bit or 16-bit signed
+instruction DIV { dtype = i8 | i16 }
+
+# Allow DIV only when using 8-bit or 16-bit signed
+instruction DIV { dtype = ~(i8 | i16) }
+
+# Combine with register constraints
+instruction MUL { rd = x5, rs1_dtype = ~i16, rs2_dtype = ~i16 }
+```
+
+See `examples/data_type_constraints.dsl` for a comprehensive example with detailed comments.
+
 ## Project Structure
 
 ```
@@ -180,7 +332,8 @@ PdatDsl/
 ├── examples/           # Example DSL files
 │   ├── example_16reg.dsl
 │   ├── example_outlawed.dsl
-│   └── rv32im.dsl
+│   ├── rv32im.dsl
+│   └── data_type_constraints.dsl
 ├── tests/                      # Unit tests
 ├── editors/                    # Editor support
 │   ├── vscode/                # VS Code extension
