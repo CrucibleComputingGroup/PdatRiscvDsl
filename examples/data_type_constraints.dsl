@@ -23,14 +23,16 @@ instruction MULH { dtype = i8 }
 instruction DIV { dtype = i8 | i16 }
 
 # With negation (~): ALLOW ONLY these types (forbid all others)
-# DIVU: allow only 16-bit unsigned (forbid everything except u16)
-instruction DIVU { dtype = ~u16 }
+# DIVU: allow only 8-bit and 16-bit unsigned (forbid i32, i64, u32, u64)
+# Note: must include u8 when allowing u16 (can't distinguish u8 from u16 when value < 256)
+instruction DIVU { dtype = ~(u8 | u16) }
 
-# REM: allow only 8-bit signed OR unsigned (forbid i16, i32, i64, u16, u32, u64)
+# REM: allow only 8-bit types signed or unsigned (forbid everything wider)
 instruction REM { dtype = ~(i8 | u8) }
 
-# REMU: allow only 16-bit types (forbid everything except i16 and u16)
-instruction REMU { dtype = ~(i16 | u16) }
+# REMU: allow only 8-bit and 16-bit types (both signed and unsigned)
+# Note: when allowing i16/u16, must also allow i8/u8
+instruction REMU { dtype = ~(i8 | u8 | i16 | u16) }
 
 # ============================================================================
 # Per-Operand Data Type Constraints

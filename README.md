@@ -215,17 +215,41 @@ instruction MUL { rd = x5, rs1_dtype = ~i8, rs2_dtype = ~(i8 | u8) }
 # Negative constraints (outlaw specific types)
 dtype = i8              # Forbid i8
 dtype = i8 | u8         # Forbid i8 OR u8
-dtype = i16 | u16 | i32 # Forbid i16, u16, or i32
+dtype = i8 | i16        # Forbid i8 and i16 (must include all widths up to max)
 
 # Positive constraints (allow only specific types)
 dtype = ~i8             # Allow only i8
 dtype = ~(i8 | u8)      # Allow only i8 or u8
-dtype = ~(i16 | u16)    # Allow only i16 or u16
+dtype = ~(u8 | u16)     # Allow only u8 or u16 (must include all widths down to min)
 
 # Invalid syntax (negation must be at start)
 dtype = ~~i8            # Error: double negation
 dtype = i8 | ~u8        # Error: negation in middle
 dtype = ~i8 | ~u8       # Error: multiple negations
+
+# Invalid semantics (creates gaps or ambiguity)
+dtype = i8 | i32        # Error: missing i16 (gap)
+dtype = ~(u16 | u32)    # Error: missing u8 (can't distinguish u8 from u16 when < 256)
+dtype = u8 | u32        # Error: forbidding u8 requires forbidding u16 too
+```
+
+#### Validation Rules
+
+**The key insight:** You cannot distinguish u8 from u16 when the value is < 256 using only bit patterns.
+
+For a given signedness (signed or unsigned):
+
+1. **Forbid constraints** (without `~`): When forbidding narrow types, must also forbid all wider types
+   - Valid: `u8 | u16` (forbid up to u16, allow u32+)
+   - Invalid: `u8 | u32` (missing u16 creates ambiguity)
+
+2. **Allow constraints** (with `~`): When allowing wide types, must also allow all narrower types
+   - Valid: `~(u8 | u16)` (allow u8 and u16)
+   - Invalid: `~(u16 | u32)` (missing u8 - can't enforce!)
+
+3. **No gaps allowed** within a signedness category
+   - Valid: `i8 | i16 | i32`
+   - Invalid: `i8 | i32` (missing i16)
 ```
 
 ## Examples

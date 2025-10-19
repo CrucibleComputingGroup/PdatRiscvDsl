@@ -120,6 +120,15 @@ class DataTypeSet:
 
     The negation inverts the constraint, allowing positive specifications within
     a negative (outlawing) framework.
+
+    Validation Rules:
+    For a given signedness, you can only forbid narrower types if you also forbid wider types.
+    This is because wider types contain all values of narrower types (e.g., u16 contains u8).
+
+    Valid:   forbid u8, u16 (allow only u32+)
+    Invalid: forbid u8, allow u16 (u16 contains u8 values!)
+    Valid:   ~(u8 | u16) = allow only u8 or u16
+    Invalid: ~(u16 | u32) = allow u16 or u32 (missing u8 creates gap!)
     """
     types: Set[DataType] = dataclass_field(default_factory=set)
     negated: bool = False  # If True, entire expression is negated (~prefix)
@@ -127,6 +136,73 @@ class DataTypeSet:
     def add(self, dtype: DataType):
         """Add a data type to the set"""
         self.types.add(dtype)
+
+    def validate(self) -> Optional[str]:
+        """
+        Validate that the dtype set is logically consistent.
+
+        Returns None if valid, error message string if invalid.
+
+        Rules:
+        - For forbid (not negated): can skip types, but forbidden types must not create gaps
+        - For allow (negated): must not have gaps in the allowed range
+
+        The key insight: you cannot distinguish u8 from u16 when value < 256 by bit patterns.
+        So forbidding u8 while allowing u16 is unenforceable.
+        """
+        if len(self.types) == 0:
+            return "DataTypeSet cannot be empty"
+
+        # Separate by signedness
+        signed_types = sorted([t for t in self.types if t.signed], key=lambda t: t.width)
+        unsigned_types = sorted([t for t in self.types if not t.signed], key=lambda t: t.width)
+
+        # Check each signedness category
+        for type_list, sign_name in [(signed_types, "signed"), (unsigned_types, "unsigned")]:
+            if len(type_list) == 0:
+                continue
+
+            widths = [t.width for t in type_list]
+            # Get prefix for error messages (i or u)
+            prefix = 'i' if type_list[0].signed else 'u'
+
+            if self.negated:
+                # ALLOW only these types: must not have gaps at the narrow end
+                # Valid:   ~(u8 | u16) = allow u8 or u16
+                # Invalid: ~(u16 | u32) = allow u16 or u32 (missing u8 - can't distinguish!)
+                #
+                # Rule: if you allow a width W, you must allow all widths < W of same signedness
+                # Check: must include all widths from 8 up to min width continuously
+                min_width = min(widths)
+                for w in [8, 16, 32]:  # Check 8, 16, 32 (64 would be max)
+                    if w < min_width:
+                        # We're missing a narrower type
+                        return f"Invalid {sign_name} type set {self}: allowing {prefix}{min_width} requires allowing all narrower types (missing {prefix}{w})"
+                    if w > min_width:
+                        break
+                # Now check no gaps within the allowed range
+                for t in type_list:
+                    for w in [8, 16, 32, 64]:
+                        if w >= t.width:
+                            break
+                        if w not in widths:
+                            return f"Invalid {sign_name} type set {self}: gap in allowed types (missing {prefix}{w} between allowed types)"
+            else:
+                # FORBID these types: must not have gaps at the wide end
+                # Valid:   u16 | u32 = forbid u16 and u32
+                # Invalid: u8 | u32 = forbid u8 and u32 (missing u16 - creates ambiguity!)
+                #
+                # Rule: if you forbid a width W, you must forbid all widths > W of same signedness
+                max_width = max(widths)
+                for t in type_list:
+                    # Check all wider widths are present
+                    for w in [8, 16, 32, 64]:
+                        if w <= t.width:
+                            continue
+                        if w not in widths and w <= max_width:
+                            return f"Invalid {sign_name} type set {self}: forbidding {prefix}{t.width} requires forbidding all wider types (missing {prefix}{w})"
+
+        return None
 
     def __str__(self):
         type_str = " | ".join(str(t) for t in sorted(self.types, key=lambda t: (t.width, not t.signed)))
@@ -669,6 +745,12 @@ class Parser:
             self.expect(TokenType.RPAREN)
 
         dtype_set.negated = negated
+
+        # Validate the dtype set
+        validation_error = dtype_set.validate()
+        if validation_error:
+            self.error(validation_error)
+
         return dtype_set
 
 # ============================================================================

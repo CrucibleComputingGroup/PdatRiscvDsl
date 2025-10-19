@@ -6,16 +6,18 @@ This script:
 1. Parses the DSL file containing instruction rules
 2. Converts high-level instruction rules to pattern/mask pairs
 3. Generates a SystemVerilog module with assertions
+4. Generates data type constraint assertions for operand bit patterns
 """
 
 import sys
 import argparse
 from typing import List, Tuple, Set, Optional
-from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule
+from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule, DataTypeSet
 from .encodings import (
     get_instruction_encoding, parse_register, set_field, create_field_mask,
     get_extension_instructions
 )
+from .dtype_codegen import generate_dtype_check_expr, generate_dtype_set_check_expr
 
 def instruction_rule_to_pattern(rule: InstructionRule) -> List[Tuple[int, int, str]]:
     """
@@ -37,6 +39,13 @@ def instruction_rule_to_pattern(rule: InstructionRule) -> List[Tuple[int, int, s
     for constraint in rule.constraints:
         field_name = constraint.field_name
         field_value = constraint.field_value
+
+        # Skip data type constraints - these are semantic metadata, not encoding constraints
+        # Data type fields: dtype, rd_dtype, rs1_dtype, rs2_dtype, imm_dtype, etc.
+        if field_name == 'dtype' or field_name.endswith('_dtype'):
+            # These constraints are for optimization/verification, not instruction encoding
+            # They will be handled separately by dedicated code generators
+            continue
 
         # Check if this field exists in the instruction format
         if field_name not in encoding.fields:
@@ -91,8 +100,12 @@ def instruction_rule_to_pattern(rule: InstructionRule) -> List[Tuple[int, int, s
 
     return [(pattern, mask, desc)]
 
-def generate_sv_module(patterns: List[Tuple[int, int, str]], module_name: str = "instr_outlawed_checker") -> str:
+def generate_sv_module(patterns: List[Tuple[int, int, str]], module_name: str = "instr_outlawed_checker",
+                       dtype_assertions: str = "") -> str:
     """Generate SystemVerilog module with pattern-matching assertions."""
+
+    # Determine if we need operand signals for dtype checks
+    needs_operands = len(dtype_assertions) > 0
 
     sv_code = f"""// Auto-generated instruction pattern checker module
 // This module checks that certain instruction patterns are never present in the pipeline
@@ -105,10 +118,17 @@ module {module_name} (
   input logic        instr_is_compressed_i,
   // Decoder outputs - for direct constraints on execution units
   input logic        mult_en_dec_i,
-  input logic        div_en_dec_i
-);
+  input logic        div_en_dec_i"""
 
-"""
+    if needs_operands:
+        sv_code += """,
+  // Operand signals for data type constraints
+  input logic [31:0] alu_operand_a_ex_i,
+  input logic [31:0] alu_operand_b_ex_i,
+  input logic [31:0] multdiv_operand_a_ex_i,
+  input logic [31:0] multdiv_operand_b_ex_i"""
+
+    sv_code += "\n);\n\n"
 
     # Group by width (assume all 32-bit for now, can add 16-bit later)
     patterns_32 = [(p, m, d) for p, m, d in patterns if m <= 0xFFFFFFFF]
@@ -147,6 +167,10 @@ module {module_name} (
     if not patterns_32:
         sv_code += "  // No outlawed instruction patterns specified\n\n"
 
+    # Add data type assertions if present
+    if dtype_assertions:
+        sv_code += dtype_assertions
+
     sv_code += "endmodule\n"
 
     return sv_code
@@ -165,6 +189,91 @@ bind ibex_core.id_stage_i {module_name} checker_inst (
 );
 """
     return bind_code
+
+def generate_dtype_assertions(rules: List[InstructionRule]) -> str:
+    """
+    Generate SystemVerilog assertions for data type constraints.
+
+    Returns SystemVerilog code to be added to the checker module.
+    """
+    code = ""
+
+    # Collect all rules with dtype constraints
+    dtype_rules = []
+    for rule in rules:
+        has_dtype = any(c.field_name == 'dtype' or c.field_name.endswith('_dtype')
+                       for c in rule.constraints)
+        if has_dtype:
+            dtype_rules.append(rule)
+
+    if not dtype_rules:
+        return ""
+
+    code += "  // ========================================\n"
+    code += "  // Data type constraint assertions\n"
+    code += "  // ========================================\n\n"
+
+    # For each rule with dtype constraints
+    for rule in dtype_rules:
+        encoding = get_instruction_encoding(rule.name)
+        if not encoding:
+            continue
+
+        # Extract dtype constraints
+        for constraint in rule.constraints:
+            field_name = constraint.field_name
+            field_value = constraint.field_value
+
+            if not isinstance(field_value, DataTypeSet):
+                continue
+
+            dtype_set = field_value
+
+            # Determine which operands to check
+            if field_name == 'dtype':
+                # Apply to all operands
+                operand_fields = []
+                if 'rs1' in encoding.fields:
+                    operand_fields.append(('rs1', 'multdiv_operand_a_ex_i' if rule.name.upper() in {'MUL', 'MULH', 'MULHSU', 'MULHU', 'DIV', 'DIVU', 'REM', 'REMU'} else 'alu_operand_a_ex_i'))
+                if 'rs2' in encoding.fields:
+                    operand_fields.append(('rs2', 'multdiv_operand_b_ex_i' if rule.name.upper() in {'MUL', 'MULH', 'MULHSU', 'MULHU', 'DIV', 'DIVU', 'REM', 'REMU'} else 'alu_operand_b_ex_i'))
+            elif field_name == 'rs1_dtype':
+                operand_fields = [('rs1', 'multdiv_operand_a_ex_i' if rule.name.upper() in {'MUL', 'MULH', 'MULHSU', 'MULHU', 'DIV', 'DIVU', 'REM', 'REMU'} else 'alu_operand_a_ex_i')]
+            elif field_name == 'rs2_dtype':
+                operand_fields = [('rs2', 'multdiv_operand_b_ex_i' if rule.name.upper() in {'MUL', 'MULH', 'MULHSU', 'MULHU', 'DIV', 'DIVU', 'REM', 'REMU'} else 'alu_operand_b_ex_i')]
+            elif field_name == 'rd_dtype':
+                # Skip rd for now - would need writeback stage signals
+                continue
+            else:
+                continue
+
+            # Generate check for each operand
+            for operand_name, signal_name in operand_fields:
+                check_expr = generate_dtype_set_check_expr(dtype_set, signal_name)
+
+                # Create instruction match condition
+                instr_match = f"((instr_rdata_i & 32'h{encoding.base_mask:08x}) == 32'h{encoding.base_pattern:08x})"
+
+                # Determine assertion condition based on negation
+                if dtype_set.negated:
+                    # Negated: ALLOW only these types (forbid all others)
+                    # Assert that operand MUST match one of the types
+                    condition = check_expr
+                    semantic = "allow only"
+                else:
+                    # Not negated: FORBID these types
+                    # Assert that operand must NOT match any of the types
+                    condition = f"!{check_expr}"
+                    semantic = "forbid"
+
+                code += f"  // {rule.name} {operand_name}: {semantic} {dtype_set}\n"
+                code += f"  always_comb begin\n"
+                code += f"    if (rst_ni && instr_valid_i && {instr_match}) begin\n"
+                code += f"      assume ({condition});\n"
+                code += f"    end\n"
+                code += f"  end\n\n"
+
+    return code
 
 def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
                                register_constraint: Optional[RegisterConstraintRule] = None):
@@ -324,6 +433,7 @@ def main():
     required_extensions = set()
     register_constraint = None
     patterns = []
+    instruction_rules = []  # Keep instruction rules for dtype processing
 
     for rule in ast.rules:
         if isinstance(rule, RequireRule):
@@ -333,6 +443,7 @@ def main():
                 print(f"Warning: Multiple register constraints found, using the last one (x{rule.min_reg}-x{rule.max_reg})")
             register_constraint = rule
         elif isinstance(rule, InstructionRule):
+            instruction_rules.append(rule)  # Save for dtype processing
             rule_patterns = instruction_rule_to_pattern(rule)
             patterns.extend(rule_patterns)
         elif isinstance(rule, PatternRule):
@@ -365,7 +476,11 @@ def main():
                 bind_file = args.output_file + '_bind.sv'
 
         print(f"Generating SystemVerilog module '{args.module_name}'...")
-        sv_code = generate_sv_module(patterns, args.module_name)
+
+        # Generate data type assertions
+        dtype_assertions = generate_dtype_assertions(instruction_rules)
+
+        sv_code = generate_sv_module(patterns, args.module_name, dtype_assertions)
 
         # Write checker module
         with open(args.output_file, 'w') as f:
