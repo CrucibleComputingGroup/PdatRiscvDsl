@@ -335,17 +335,30 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += "  end\n\n"
 
     # Generate positive constraints from required extensions
+    valid_patterns = []  # Define at this scope so it's accessible later
     if required_extensions:
         code += "  // Positive constraint: instruction must be from required extensions\n"
         code += f"  // Required: {', '.join(sorted(required_extensions))}\n"
 
+        # Extract outlawed instruction names from patterns for filtering
+        outlawed_names = set()
+        for pattern, mask, desc in patterns:
+            # Extract instruction name from description (format: "INSTR" or "INSTR { constraints }")
+            instr_name = desc.split()[0].split('{')[0].strip()
+            outlawed_names.add(instr_name)
+
+        if outlawed_names:
+            code += f"  // Excluding outlawed: {', '.join(sorted(outlawed_names))}\n"
+
         # Collect all valid instruction patterns from required extensions
-        valid_patterns = []
+        # BUT exclude those that are outlawed
         for ext in required_extensions:
             ext_instrs = get_extension_instructions(ext)
             if ext_instrs:
                 for name, encoding in ext_instrs.items():
-                    valid_patterns.append((encoding.base_pattern, encoding.base_mask, f"{name} ({ext})"))
+                    # Skip if this instruction is outlawed
+                    if name not in outlawed_names:
+                        valid_patterns.append((encoding.base_pattern, encoding.base_mask, f"{name} ({ext})"))
 
         if valid_patterns:
             code += "  // Instruction must match one of these valid patterns (OR of all valid instructions)\n"
@@ -365,6 +378,18 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         if not required_extensions:
             code += "  // No instruction constraints specified\n\n"
         return code
+
+    # If we have positive constraints from required extensions, we don't need negative constraints
+    # The positive constraint already excludes outlawed instructions
+    if required_extensions and valid_patterns:
+        code += "  // Note: Negative constraints not needed - outlawed instructions already excluded from positive list\n\n"
+        return code
+
+    # Only generate negative constraints if we don't have positive constraints
+    # (This is for backward compatibility or when no extensions are specified)
+    # Check if we have MUL/DIV instructions
+    has_mul = any('MUL' in desc for _, _, desc in patterns)
+    has_div = any('DIV' in desc or 'REM' in desc for _, _, desc in patterns)
 
     code += "  // Instruction encoding constraints (unconditional form for ABC)\n"
     code += "  // When out of reset and instruction is uncompressed, these patterns don't occur\n"
