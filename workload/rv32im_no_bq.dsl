@@ -5,8 +5,8 @@
 require RV32I
 require RV32M
 
-# Outlaw all multiply and divide instructions (RV32M extension)
-# Even though RV32M is required above, these specific instructions are outlawed
+# Outlaw all branch instructions (BNE, BLT, BGE, BLTU, BGEU)
+# Even though RV32I is required above, these specific branch instructions are outlawed
 instruction BNE
 instruction BLT
 instruction BGE
