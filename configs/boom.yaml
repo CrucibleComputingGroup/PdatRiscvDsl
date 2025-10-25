@@ -10,6 +10,11 @@
 core_name: "boom"
 architecture: "rv64"  # BOOM supports RV64GC
 
+# Where to inject inline assumptions
+injection:
+  module_path: "BoomCore.exe_units_0"
+  description: "Execution unit 0 - where decoded micro-ops are executed"
+
 # Signal naming conventions for BOOM (example - verify against your BOOM version)
 signals:
   # Instruction and PC signals

@@ -255,6 +255,8 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
     code = "\n  // ========================================\n"
     code += "  // Auto-generated instruction constraints\n"
     code += f"  // Target core: {config.core_name} ({config.architecture})\n"
+    code += f"  // Inject into: {config.injection.module_path}\n"
+    code += f"  // Location: {config.injection.description}\n"
     code += "  // ========================================\n\n"
 
     # Add PC constraint if specified

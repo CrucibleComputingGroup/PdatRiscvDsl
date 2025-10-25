@@ -94,6 +94,9 @@ additionalProperties: false
 #
 # core_name: "ibex"
 # architecture: "rv32"
+# injection:
+#   module_path: "ibex_core.id_stage_i"
+#   description: "ID/Decode stage"
 # signals:
 #   instruction_data: "instr_rdata_i"
 #   pc: "pc_if_o"

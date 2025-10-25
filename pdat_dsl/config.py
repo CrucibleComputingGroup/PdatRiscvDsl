@@ -21,7 +21,7 @@ CORE_CONFIG_SCHEMA = {
     "title": "PDAT Core Configuration",
     "description": "Configuration for targeting different RISC-V cores",
     "type": "object",
-    "required": ["core_name", "architecture", "signals"],
+    "required": ["core_name", "architecture", "injection", "signals"],
     "properties": {
         "core_name": {
             "type": "string",
@@ -31,6 +31,22 @@ CORE_CONFIG_SCHEMA = {
             "type": "string",
             "enum": ["rv32", "rv64"],
             "description": "RISC-V architecture variant"
+        },
+        "injection": {
+            "type": "object",
+            "required": ["module_path"],
+            "description": "Where to inject inline assumptions in the hierarchy",
+            "properties": {
+                "module_path": {
+                    "type": "string",
+                    "description": "Hierarchical path to the module where assumptions are injected"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Human-readable description of the injection point"
+                }
+            },
+            "additionalProperties": False
         },
         "signals": {
             "type": "object",
@@ -85,6 +101,23 @@ CORE_CONFIG_SCHEMA = {
     },
     "additionalProperties": False
 }
+
+
+@dataclass
+class InjectionPoint:
+    """Defines where to inject inline assumptions in the core hierarchy."""
+    module_path: str = "ibex_core.id_stage_i"
+    description: str = "ID/Decode stage"
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> 'InjectionPoint':
+        """Create InjectionPoint from dictionary."""
+        injection = cls()
+        if 'module_path' in d:
+            injection.module_path = d['module_path']
+        if 'description' in d:
+            injection.description = d['description']
+        return injection
 
 
 @dataclass
@@ -146,6 +179,7 @@ class CoreConfig:
     """Complete configuration for a RISC-V core target."""
     core_name: str = "ibex"
     architecture: str = "rv32"  # rv32 or rv64
+    injection: InjectionPoint = field(default_factory=InjectionPoint)
     signals: SignalConfig = field(default_factory=SignalConfig)
     vcd: VcdConfig = field(default_factory=VcdConfig)
 
@@ -174,6 +208,8 @@ class CoreConfig:
         if 'architecture' in data:
             config.architecture = data['architecture']
 
+        if 'injection' in data:
+            config.injection = InjectionPoint.from_dict(data['injection'])
         if 'signals' in data:
             config.signals = SignalConfig.from_dict(data['signals'])
         if 'vcd' in data:
@@ -187,6 +223,7 @@ class CoreConfig:
         return cls(
             core_name="ibex",
             architecture="rv32",
+            injection=InjectionPoint(),
             signals=SignalConfig(),
             vcd=VcdConfig()
         )

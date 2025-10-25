@@ -7,6 +7,11 @@
 core_name: "ibex"
 architecture: "rv32"  # Ibex is RV32IMC
 
+# Where to inject inline assumptions
+injection:
+  module_path: "ibex_core.id_stage_i"
+  description: "ID/Decode stage - where instructions are decoded"
+
 # Signal naming conventions for Ibex
 signals:
   # Instruction and PC signals
