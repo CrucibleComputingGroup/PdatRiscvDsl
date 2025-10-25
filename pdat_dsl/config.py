@@ -99,7 +99,7 @@ CORE_CONFIG_SCHEMA = {
             "additionalProperties": False
         }
     },
-    "additionalProperties": False
+    "additionalProperties": True  # Allow extensions like 'synthesis' for PdatScorr
 }
 
 
