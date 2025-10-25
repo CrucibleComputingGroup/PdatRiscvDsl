@@ -140,10 +140,32 @@ data_type = ("i" | "u") ("8" | "16" | "32" | "64")
 
 ### Keywords
 
-- `require` - Specify required instruction extensions (RV32I, RV32M, RV64I, etc.)
+- `require` - Specify required instruction extensions (RV32I, RV32M, RV32C, RV64I, etc.)
 - `require_registers` - Limit which registers can be used
 - `instruction` - Outlaw a specific instruction by name
 - `pattern` / `mask` - Outlaw instructions matching a specific bit pattern
+
+### Compressed Instruction Support (C Extension)
+
+When `require RV32C` or `require RV64C` is specified, the DSL automatically handles compressed instructions:
+
+- **Auto-expansion**: Outlawing an instruction like `ADD` will automatically also outlaw its compressed equivalent `C.ADD` if it exists
+- **Compression bit enforcement**: Generated constraints ensure `instr_is_compressed_i` matches the actual encoding bits[1:0]:
+  - Compressed instructions have bits[1:0] ≠ 11
+  - Uncompressed instructions have bits[1:0] = 11
+- **Dual-width pattern matching**: 32-bit patterns check `instr_rdata_i[31:0]`, 16-bit patterns check `instr_rdata_i[15:0]`
+
+You can also explicitly specify compressed instructions:
+```
+require RV32C
+
+# Auto-expands to outlaw both ADD and C.ADD
+instruction ADD
+
+# Explicitly outlaw only the compressed version
+instruction C.MV
+instruction C.JALR
+```
 
 ### Data Type Constraints
 
@@ -282,6 +304,25 @@ instruction MUL
 instruction MULH
 instruction MULHSU
 instruction MULHU
+```
+
+### Example 2.5: RV32IC with compressed instructions
+
+```
+# File: examples/rv32ic.dsl
+require RV32I
+require RV32C
+
+# Outlaw M extension (multiplication/division)
+# Since RV32C is required, this will also outlaw compressed versions if they existed
+instruction MUL
+instruction MULH
+instruction MULHSU
+instruction MULHU
+instruction DIV
+instruction DIVU
+instruction REM
+instruction REMU
 ```
 
 ### Example 3: Data type constraints for narrow arithmetic
