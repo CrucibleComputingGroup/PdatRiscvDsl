@@ -11,7 +11,7 @@ This script:
 import sys
 import argparse
 from typing import List, Tuple, Set, Optional
-from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule
+from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule, PcConstraintRule
 from .encodings import (
     get_instruction_encoding, parse_register, get_extension_instructions,
     R_TYPE_FIELDS, I_TYPE_FIELDS, S_TYPE_FIELDS, B_TYPE_FIELDS
@@ -251,13 +251,34 @@ def instruction_rule_to_pattern(rule: InstructionRule) -> List[Tuple[int, int, s
 
     return [(pattern, mask, desc)]
 
+def generate_pc_constraints(pc_bits: Optional[int]) -> str:
+    """Generate PC address space constraint."""
+    if pc_bits is None:
+        return ""
+
+    addr_space_kb = (2 ** pc_bits) // 1024
+    constraint = f"    // PC address space constraint: {pc_bits}-bit address space ({addr_space_kb}KB)\n"
+    constraint += "    constraint pc_addr_space {\n"
+    constraint += f"      pc[31:{pc_bits}] == {32-pc_bits}'b0;\n"
+    constraint += "    }\n\n"
+    return constraint
+
 def generate_sv_class(
     required_extensions: Set[str],
     outlawed_patterns: List[Tuple[int, int, str]],
     register_rules: List[RegisterConstraintRule],
+    pc_bits: Optional[int] = None,
     class_name: str = "instr_constraints"
 ) -> str:
-    """Generate SystemVerilog constraint class."""
+    """Generate SystemVerilog constraint class.
+
+    Args:
+        required_extensions: Set of required RISC-V extensions
+        outlawed_patterns: List of (pattern, mask, description) tuples for outlawed instructions
+        register_rules: List of register constraint rules
+        pc_bits: Number of PC address bits (e.g., 16 for 64KB). If provided, constrains PC[31:pc_bits] to 0
+        class_name: Name of the generated constraint class
+    """
 
     sv_code = f"""// Auto-generated instruction randomization constraints
 // This class defines constraints for randomized instruction generation
@@ -265,8 +286,14 @@ def generate_sv_class(
 class {class_name};
     // The instruction word to be randomized
     rand logic [31:0] instr_word;
-
 """
+
+    # Add PC variable if PC constraint is specified
+    if pc_bits is not None:
+        sv_code += "    // Program counter (for address space constraints)\n"
+        sv_code += "    rand logic [31:0] pc;\n"
+
+    sv_code += "\n"
 
     # Generate valid instruction constraint
     if required_extensions:
@@ -279,6 +306,10 @@ class {class_name};
     # Generate register constraints
     if register_rules and required_extensions:
         sv_code += generate_register_constraints(register_rules, required_extensions)
+
+    # Generate PC constraints
+    if pc_bits is not None:
+        sv_code += generate_pc_constraints(pc_bits)
 
     sv_code += "endclass\n"
     return sv_code
@@ -311,6 +342,7 @@ def main():
     # Extract rules
     required_extensions = set()
     register_rules = []
+    pc_constraint = None
     instruction_rules = []
     pattern_rules = []
 
@@ -319,6 +351,10 @@ def main():
             required_extensions.add(rule.extension)
         elif isinstance(rule, RegisterConstraintRule):
             register_rules.append(rule)
+        elif isinstance(rule, PcConstraintRule):
+            if pc_constraint is not None:
+                print(f"Warning: Multiple PC constraints found, using the last one ({rule.pc_bits} bits)", file=sys.stderr)
+            pc_constraint = rule
         elif isinstance(rule, InstructionRule):
             instruction_rules.append(rule)
         elif isinstance(rule, PatternRule):
@@ -327,6 +363,9 @@ def main():
     if args.verbose:
         print(f"Found {len(required_extensions)} required extensions: {sorted(required_extensions)}")
         print(f"Found {len(register_rules)} register constraint rules")
+        if pc_constraint:
+            addr_space_kb = (2 ** pc_constraint.pc_bits) // 1024
+            print(f"Found PC constraint: {pc_constraint.pc_bits} bits ({addr_space_kb}KB)")
         print(f"Found {len(instruction_rules)} instruction rules")
         print(f"Found {len(pattern_rules)} pattern rules")
 
@@ -341,8 +380,11 @@ def main():
         desc = rule.description if rule.description else f"Pattern 0x{rule.pattern:08x}"
         outlawed_patterns.append((rule.pattern, rule.mask, desc))
 
+    # Extract PC bits if PC constraint is specified
+    pc_bits = pc_constraint.pc_bits if pc_constraint else None
+
     # Generate SystemVerilog
-    sv_code = generate_sv_class(required_extensions, outlawed_patterns, register_rules)
+    sv_code = generate_sv_class(required_extensions, outlawed_patterns, register_rules, pc_bits)
 
     # Write output
     try:

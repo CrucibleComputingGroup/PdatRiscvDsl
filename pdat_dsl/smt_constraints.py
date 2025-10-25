@@ -9,7 +9,7 @@ constraints on input signals.
 import sys
 from pathlib import Path
 
-from .parser import parse_dsl, InstructionRule, PatternRule, RequireRule
+from .parser import parse_dsl, InstructionRule, PatternRule, RequireRule, PcConstraintRule
 from .codegen import instruction_rule_to_pattern
 
 
@@ -30,11 +30,16 @@ def generate_smt2_constraints(dsl_file: Path, module_name: str = "ibex_core") ->
     smt2_lines.append(f"; Source: {dsl_file.name}")
     smt2_lines.append("")
 
+    # Check if any rule requires PC constraint
+    has_pc_constraint = any(isinstance(rule, PcConstraintRule) for rule in program.rules)
+
     # Declare constrained inputs as free variables
     smt2_lines.append("; Cut-point inputs (free variables constrained by assumptions)")
     smt2_lines.append("(declare-const instr_rdata_i (_ BitVec 32))")
     smt2_lines.append("(declare-const rst_ni Bool)")
     smt2_lines.append("(declare-const instr_is_compressed Bool)")
+    if has_pc_constraint:
+        smt2_lines.append("(declare-const pc_if (_ BitVec 32))")
     smt2_lines.append("")
 
     # Generate constraints from DSL rules
@@ -68,6 +73,22 @@ def generate_smt2_constraints(dsl_file: Path, module_name: str = "ibex_core") ->
             smt2_lines.append(f"; Required extension: {rule.extension}")
             # Positive constraints - would need to enumerate all valid instructions
             # Skip for now as negative constraints are sufficient
+
+        elif isinstance(rule, PcConstraintRule):
+            # PC address space constraint
+            pc_bits = rule.pc_bits
+            addr_space_kb = (2 ** pc_bits) // 1024
+            smt2_lines.append(f"; PC constraint: {pc_bits}-bit address space ({addr_space_kb}KB)")
+            smt2_lines.append(f"; Upper {32 - pc_bits} bits of PC must be 0")
+            # Extract upper bits and assert they are zero
+            # pc_if[31:pc_bits] == 0  ->  (bvand pc_if upper_mask) == 0
+            # Upper mask: bits [31:pc_bits] set to 1, rest 0
+            if pc_bits < 32:
+                upper_mask = ((1 << (32 - pc_bits)) - 1) << pc_bits
+                smt2_lines.append(
+                    f"(assert (or (not rst_ni) "
+                    f"(= (bvand pc_if #x{upper_mask:08x}) #x00000000)))"
+                )
 
     smt2_lines.append("")
     return '\n'.join(smt2_lines)

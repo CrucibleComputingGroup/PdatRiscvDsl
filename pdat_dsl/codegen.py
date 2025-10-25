@@ -12,7 +12,7 @@ This script:
 import sys
 import argparse
 from typing import List, Tuple, Set, Optional
-from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule, DataTypeSet
+from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule, PcConstraintRule, DataTypeSet
 from .encodings import (
     get_instruction_encoding, parse_register, set_field, create_field_mask,
     get_extension_instructions
@@ -127,11 +127,20 @@ def instruction_rule_to_pattern(rule: InstructionRule, has_c_ext: bool = False) 
     return results
 
 def generate_sv_module(patterns: List[Tuple[int, int, str]], module_name: str = "instr_outlawed_checker",
-                       dtype_assertions: str = "") -> str:
-    """Generate SystemVerilog module with pattern-matching assertions."""
+                       dtype_assertions: str = "", pc_bits: Optional[int] = None) -> str:
+    """Generate SystemVerilog module with pattern-matching assertions.
+
+    Args:
+        patterns: List of (pattern, mask, description, is_compressed) tuples
+        module_name: Name of the generated module
+        dtype_assertions: Data type constraint assertions
+        pc_bits: Number of PC address bits (e.g., 16 for 64KB). If provided, constrains PC[31:pc_bits] to 0
+    """
 
     # Determine if we need operand signals for dtype checks
     needs_operands = len(dtype_assertions) > 0
+    # Determine if we need PC input
+    needs_pc = pc_bits is not None
 
     sv_code = f"""// Auto-generated instruction pattern checker module
 // This module checks that certain instruction patterns are never present in the pipeline
@@ -141,9 +150,12 @@ module {module_name} (
   input logic        rst_ni,
   input logic        instr_valid_i,
   input logic [31:0] instr_rdata_i,
-  input logic        instr_is_compressed_i
-);
-"""
+  input logic        instr_is_compressed_i"""
+
+    if needs_pc:
+        sv_code += """,
+  // PC signal for address space constraints
+  input logic [31:0] pc_if_i"""
 
     if needs_operands:
         sv_code += """,
@@ -154,6 +166,20 @@ module {module_name} (
   input logic [31:0] multdiv_operand_b_ex_i"""
 
     sv_code += "\n);\n\n"
+
+    # Add PC constraint if specified
+    if pc_bits is not None:
+        addr_space_kb = (2 ** pc_bits) // 1024
+        sv_code += f"  // ========================================\n"
+        sv_code += f"  // PC address space constraint\n"
+        sv_code += f"  // Constrains PC to {pc_bits}-bit address space ({addr_space_kb}KB)\n"
+        sv_code += f"  // ========================================\n\n"
+        sv_code += f"  // Constrain upper PC bits to 0 (PC limited to {addr_space_kb}KB)\n"
+        sv_code += f"  always_comb begin\n"
+        sv_code += f"    if (rst_ni) begin\n"
+        sv_code += f"      assume (pc_if_i[31:{pc_bits}] == {32-pc_bits}'b0);\n"
+        sv_code += f"    end\n"
+        sv_code += f"  end\n\n"
 
     # Group by width (assume all 32-bit for now, can add 16-bit later)
     patterns_32 = [(p, m, d) for p, m, d in patterns if m <= 0xFFFFFFFF]
@@ -183,8 +209,13 @@ module {module_name} (
 
     return sv_code
 
-def generate_bind_file(module_name: str) -> str:
-    """Generate a bind file for the checker module."""
+def generate_bind_file(module_name: str, needs_pc: bool = False) -> str:
+    """Generate a bind file for the checker module.
+
+    Args:
+        module_name: Name of the module to bind
+        needs_pc: Whether the module requires pc_if_i signal
+    """
     bind_code = f"""// Auto-generated bind file for {module_name}
 // This file binds the instruction checker to the Ibex ID stage
 
@@ -193,9 +224,13 @@ bind ibex_core.id_stage_i {module_name} checker_inst (
   .rst_ni                 (rst_ni),
   .instr_valid_i          (instr_valid_i),
   .instr_rdata_i          (instr_rdata_i),
-  .instr_is_compressed_i  (instr_is_compressed_i)
-);
-"""
+  .instr_is_compressed_i  (instr_is_compressed_i)"""
+
+    if needs_pc:
+        bind_code += """,
+  .pc_if_i                (pc_if_o)"""
+
+    bind_code += "\n);\n"
     return bind_code
 
 def generate_dtype_assertions(rules: List[InstructionRule]) -> str:
@@ -284,12 +319,29 @@ def generate_dtype_assertions(rules: List[InstructionRule]) -> str:
     return code
 
 def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
-                               register_constraint: Optional[RegisterConstraintRule] = None):
-    """Generate assumptions to inject directly into ID stage (no separate module)."""
+                               register_constraint: Optional[RegisterConstraintRule] = None,
+                               pc_bits: Optional[int] = None):
+    """Generate assumptions to inject directly into ID stage (no separate module).
+
+    Args:
+        patterns: List of (pattern, mask, description, is_compressed) tuples
+        required_extensions: Set of required RISC-V extensions
+        register_constraint: Register range constraint if specified
+        pc_bits: Number of PC address bits (e.g., 16 for 64KB). If provided, constrains PC[31:pc_bits] to 0
+    """
 
     code = "\n  // ========================================\n"
     code += "  // Auto-generated instruction constraints\n"
     code += "  // ========================================\n\n"
+
+    # Add PC constraint if specified
+    if pc_bits is not None:
+        addr_space_kb = (2 ** pc_bits) // 1024
+        code += f"  // PC address space constraint: {pc_bits}-bit address space ({addr_space_kb}KB)\n"
+        code += f"  // Constrain upper PC bits to 0\n"
+        code += "  always_comb begin\n"
+        code += f"    assume (!rst_ni || (pc_if_o[31:{pc_bits}] == {32-pc_bits}'b0));\n"
+        code += "  end\n\n"
 
     # Add compression bit consistency check
     code += "  // Compression bit consistency: instr_is_compressed_i must match encoding bits[1:0]\n"
@@ -497,9 +549,10 @@ def main():
     if has_c_ext:
         print("C extension detected - will auto-expand compressed instructions")
 
-    # Separate rules into required extensions, register constraints, and outlawed patterns
+    # Separate rules into required extensions, register constraints, PC constraints, and outlawed patterns
     required_extensions = set()
     register_constraint = None
+    pc_constraint = None
     patterns = []
     instruction_rules = []  # Keep instruction rules for dtype processing
 
@@ -510,6 +563,10 @@ def main():
             if register_constraint is not None:
                 print(f"Warning: Multiple register constraints found, using the last one (x{rule.min_reg}-x{rule.max_reg})")
             register_constraint = rule
+        elif isinstance(rule, PcConstraintRule):
+            if pc_constraint is not None:
+                print(f"Warning: Multiple PC constraints found, using the last one ({rule.pc_bits} bits)")
+            pc_constraint = rule
         elif isinstance(rule, InstructionRule):
             instruction_rules.append(rule)  # Save for dtype processing
             rule_patterns = instruction_rule_to_pattern(rule, has_c_ext)
@@ -522,12 +579,17 @@ def main():
         print(f"Required extensions: {', '.join(sorted(required_extensions))}")
     if register_constraint:
         print(f"Register constraint: x{register_constraint.min_reg}-x{register_constraint.max_reg} ({register_constraint.max_reg - register_constraint.min_reg + 1} registers)")
+    if pc_constraint:
+        addr_space_kb = (2 ** pc_constraint.pc_bits) // 1024
+        print(f"PC constraint: {pc_constraint.pc_bits} bits ({addr_space_kb}KB address space)")
     print(f"Generated {len(patterns)} outlawed patterns")
 
     # Generate code
+    pc_bits = pc_constraint.pc_bits if pc_constraint else None
+
     if args.inline:
         # Generate inline assumptions code only
-        code = generate_inline_assumptions(patterns, required_extensions, register_constraint)
+        code = generate_inline_assumptions(patterns, required_extensions, register_constraint, pc_bits)
         with open(args.output_file, 'w') as f:
             f.write(code)
         print(f"Successfully wrote inline assumptions to {args.output_file}")
@@ -548,7 +610,7 @@ def main():
         # Generate data type assertions
         dtype_assertions = generate_dtype_assertions(instruction_rules)
 
-        sv_code = generate_sv_module(patterns, args.module_name, dtype_assertions)
+        sv_code = generate_sv_module(patterns, args.module_name, dtype_assertions, pc_bits)
 
         # Write checker module
         with open(args.output_file, 'w') as f:
@@ -556,7 +618,7 @@ def main():
         print(f"Successfully wrote {args.output_file}")
 
         # Generate and write bind file
-        bind_code = generate_bind_file(args.module_name)
+        bind_code = generate_bind_file(args.module_name, needs_pc=(pc_bits is not None))
         with open(bind_file, 'w') as f:
             f.write(bind_code)
         print(f"Successfully wrote {bind_file}")
