@@ -19,12 +19,23 @@ from .encodings import (
 )
 from .dtype_codegen import generate_dtype_check_expr, generate_dtype_set_check_expr
 
-def instruction_rule_to_pattern(rule: InstructionRule) -> List[Tuple[int, int, str]]:
+def has_c_extension_required(rules: List) -> bool:
+    """Check if RV32C or RV64C extension is required in the rules."""
+    for rule in rules:
+        if isinstance(rule, RequireRule):
+            if rule.extension.upper() in ('RV32C', 'RV64C'):
+                return True
+    return False
+
+def instruction_rule_to_pattern(rule: InstructionRule, has_c_ext: bool = False) -> List[Tuple[int, int, str, bool]]:
     """
-    Convert an InstructionRule to one or more (pattern, mask, description) tuples.
+    Convert an InstructionRule to one or more (pattern, mask, description, is_compressed) tuples.
 
     Returns a list because some rules with wildcards might expand to multiple patterns.
+    When has_c_ext is True, auto-expands to include compressed versions of instructions.
     """
+    results = []
+
     # Get the base encoding for this instruction
     encoding = get_instruction_encoding(rule.name)
     if not encoding:
@@ -98,7 +109,22 @@ def instruction_rule_to_pattern(rule: InstructionRule) -> List[Tuple[int, int, s
         constraint_strs = [f"{c.field_name}={c.field_value}" for c in rule.constraints]
         desc += " { " + ", ".join(constraint_strs) + " }"
 
-    return [(pattern, mask, desc)]
+    # Add the base instruction pattern
+    results.append((pattern, mask, desc, encoding.is_compressed))
+
+    # If C extension is required and this is not already a compressed instruction,
+    # check if a compressed version exists and add it too
+    if has_c_ext and not encoding.is_compressed and not rule.name.startswith('C.'):
+        compressed_name = f"C.{rule.name}"
+        compressed_encoding = get_instruction_encoding(compressed_name)
+        if compressed_encoding:
+            # For compressed version, we don't apply field constraints since they're different formats
+            # Just outlaw the compressed version entirely
+            compressed_desc = f"{compressed_name} (auto-expanded from {rule.name})"
+            results.append((compressed_encoding.base_pattern, compressed_encoding.base_mask,
+                          compressed_desc, True))
+
+    return results
 
 def generate_sv_module(patterns: List[Tuple[int, int, str]], module_name: str = "instr_outlawed_checker",
                        dtype_assertions: str = "") -> str:
@@ -265,6 +291,13 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
     code += "  // Auto-generated instruction constraints\n"
     code += "  // ========================================\n\n"
 
+    # Add compression bit consistency check
+    code += "  // Compression bit consistency: instr_is_compressed_i must match encoding bits[1:0]\n"
+    code += "  // Compressed instructions have bits[1:0] != 11, uncompressed have bits[1:0] == 11\n"
+    code += "  always_comb begin\n"
+    code += "    assume (!rst_ni || (instr_is_compressed_i == (instr_rdata_i[1:0] != 2'b11)));\n"
+    code += "  end\n\n"
+
     # Generate register constraints
     if register_constraint:
         min_reg = register_constraint.min_reg
@@ -343,7 +376,11 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
 
         # Extract outlawed instruction names from patterns for filtering
         outlawed_names = set()
-        for pattern, mask, desc in patterns:
+        for item in patterns:
+            if len(item) == 4:  # New format with is_compressed flag
+                pattern, mask, desc, is_compressed = item
+            else:  # Legacy format
+                pattern, mask, desc = item
             # Extract instruction name from description (format: "INSTR" or "INSTR { constraints }")
             instr_name = desc.split()[0].split('{')[0].strip()
             outlawed_names.add(instr_name)
@@ -388,18 +425,41 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
 
     # Only generate negative constraints if we don't have positive constraints
     # (This is for backward compatibility or when no extensions are specified)
-    # Check if we have MUL/DIV instructions
-    has_mul = any('MUL' in desc for _, _, desc in patterns)
-    has_div = any('DIV' in desc or 'REM' in desc for _, _, desc in patterns)
 
-    code += "  // Instruction encoding constraints (unconditional form for ABC)\n"
-    code += "  // When out of reset and instruction is uncompressed, these patterns don't occur\n"
-    code += "  // Written as: assume (!rst_ni || instr_is_compressed_i || pattern_mismatch)\n"
-    for pattern, mask, desc in patterns:
-        code += f"  // {desc}: Pattern=0x{pattern:08x}, Mask=0x{mask:08x}\n"
-        code += f"  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || ((instr_rdata_i & 32'h{mask:08x}) != 32'h{pattern:08x}));\n"
-        code += f"  end\n\n"
+    # Separate patterns by compression
+    patterns_32bit = []
+    patterns_16bit = []
+    for item in patterns:
+        if len(item) == 4:  # New format with is_compressed flag
+            pattern, mask, desc, is_compressed = item
+        else:  # Legacy format without is_compressed flag
+            pattern, mask, desc = item
+            is_compressed = False
+
+        if is_compressed:
+            patterns_16bit.append((pattern, mask, desc))
+        else:
+            patterns_32bit.append((pattern, mask, desc))
+
+    # Generate constraints for 32-bit instructions
+    if patterns_32bit:
+        code += "  // 32-bit instruction outlawed patterns\n"
+        code += "  // When out of reset and instruction is uncompressed, these patterns don't occur\n"
+        for pattern, mask, desc in patterns_32bit:
+            code += f"  // {desc}: Pattern=0x{pattern:08x}, Mask=0x{mask:08x}\n"
+            code += f"  always_comb begin\n"
+            code += f"    assume (!rst_ni || instr_is_compressed_i || ((instr_rdata_i[31:0] & 32'h{mask:08x}) != 32'h{pattern:08x}));\n"
+            code += f"  end\n\n"
+
+    # Generate constraints for 16-bit compressed instructions
+    if patterns_16bit:
+        code += "  // 16-bit compressed instruction outlawed patterns\n"
+        code += "  // When out of reset and instruction is compressed, these patterns don't occur\n"
+        for pattern, mask, desc in patterns_16bit:
+            code += f"  // {desc}: Pattern=0x{pattern:04x}, Mask=0x{mask:04x}\n"
+            code += f"  always_comb begin\n"
+            code += f"    assume (!rst_ni || !instr_is_compressed_i || ((instr_rdata_i[15:0] & 16'h{mask:04x}) != 16'h{pattern:04x}));\n"
+            code += f"  end\n\n"
 
     return code
 
@@ -432,6 +492,11 @@ def main():
 
     print(f"Found {len(ast.rules)} rules")
 
+    # Check if C extension is required
+    has_c_ext = has_c_extension_required(ast.rules)
+    if has_c_ext:
+        print("C extension detected - will auto-expand compressed instructions")
+
     # Separate rules into required extensions, register constraints, and outlawed patterns
     required_extensions = set()
     register_constraint = None
@@ -447,11 +512,11 @@ def main():
             register_constraint = rule
         elif isinstance(rule, InstructionRule):
             instruction_rules.append(rule)  # Save for dtype processing
-            rule_patterns = instruction_rule_to_pattern(rule)
+            rule_patterns = instruction_rule_to_pattern(rule, has_c_ext)
             patterns.extend(rule_patterns)
         elif isinstance(rule, PatternRule):
             desc = rule.description if rule.description else f"Pattern at line {rule.line}"
-            patterns.append((rule.pattern, rule.mask, desc))
+            patterns.append((rule.pattern, rule.mask, desc, False))  # PatternRules are always 32-bit
 
     if required_extensions:
         print(f"Required extensions: {', '.join(sorted(required_extensions))}")
