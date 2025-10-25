@@ -182,13 +182,13 @@ module {module_name} (
         sv_code += f"  end\n\n"
 
     # Group by width (assume all 32-bit for now, can add 16-bit later)
-    patterns_32 = [(p, m, d) for p, m, d in patterns if m <= 0xFFFFFFFF]
+    patterns_32 = [(p, m, d, is_c) for p, m, d, is_c in patterns if m <= 0xFFFFFFFF]
 
     if patterns_32:
         sv_code += "  // 32-bit outlawed instruction patterns\n"
         sv_code += "  // Using combinational 'assume' so ABC can use them as don't-care conditions\n"
         sv_code += "  // This allows ABC to optimize away logic for these instructions\n"
-        for i, (pattern, mask, desc) in enumerate(patterns_32):
+        for i, (pattern, mask, desc, is_compressed) in enumerate(patterns_32):
             sv_code += f"  // {desc}\n"
             sv_code += f"  // Pattern: 0x{pattern:08x}, Mask: 0x{mask:08x}\n"
             sv_code += f"  // Combinational assumption: when valid, this pattern doesn't occur\n"
@@ -310,8 +310,10 @@ def generate_dtype_assertions(rules: List[InstructionRule]) -> str:
                     semantic = "forbid"
 
                 code += f"  // {rule.name} {operand_name}: {semantic} {dtype_set}\n"
+                code += f"  // Unconditional assumption (no rst_ni/instr_valid_i check)\n"
+                code += f"  // This allows ABC to use dtype constraint for optimization\n"
                 code += f"  always_comb begin\n"
-                code += f"    if (rst_ni && instr_valid_i && {instr_match}) begin\n"
+                code += f"    if ({instr_match}) begin\n"
                 code += f"      assume ({condition});\n"
                 code += f"    end\n"
                 code += f"  end\n\n"
@@ -338,17 +340,15 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
     if pc_bits is not None:
         addr_space_kb = (2 ** pc_bits) // 1024
         code += f"  // PC address space constraint: {pc_bits}-bit address space ({addr_space_kb}KB)\n"
-        code += f"  // Constrain upper PC bits to 0\n"
+        code += f"  // Unconditional assumption for ABC optimization\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || (pc_if_o[31:{pc_bits}] == {32-pc_bits}'b0));\n"
+        code += f"    assume (pc_if_o[31:{pc_bits}] == {32-pc_bits}'b0);\n"
         code += "  end\n\n"
 
-    # Add compression bit consistency check
-    code += "  // Compression bit consistency: instr_is_compressed_i must match encoding bits[1:0]\n"
-    code += "  // Compressed instructions have bits[1:0] != 11, uncompressed have bits[1:0] == 11\n"
-    code += "  always_comb begin\n"
-    code += "    assume (!rst_ni || (instr_is_compressed_i == (instr_rdata_i[1:0] != 2'b11)));\n"
-    code += "  end\n\n"
+    # Note: No compression bit consistency check needed
+    # We directly check instr_rdata_i[1:0] in each assumption instead of using instr_is_compressed_i
+    # This reduces signal dependencies and gives ABC more optimization freedom
+
 
     # Generate register constraints
     if register_constraint:
@@ -367,7 +367,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += "                   (instr_rdata_i[6:2] == 5'b10100) ||  // OP-FP\n"
         code += "                   (instr_rdata_i[6:2] == 5'b10110);    // OP-V\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || !is_r_type ||\n"
+        code += f"    assume ((instr_rdata_i[1:0] != 2'b11) || !is_r_type ||\n"
         code += f"            ((instr_rdata_i[11:7] <= 5'd{max_reg}) &&   // rd\n"
         code += f"             (instr_rdata_i[19:15] <= 5'd{max_reg}) &&  // rs1\n"
         code += f"             (instr_rdata_i[24:20] <= 5'd{max_reg})));\n"
@@ -380,7 +380,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += "                   (instr_rdata_i[6:2] == 5'b00110) ||  // OP-IMM-32\n"
         code += "                   (instr_rdata_i[6:2] == 5'b11001);    // JALR\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || !is_i_type ||\n"
+        code += f"    assume ((instr_rdata_i[1:0] != 2'b11) || !is_i_type ||\n"
         code += f"            ((instr_rdata_i[11:7] <= 5'd{max_reg}) &&   // rd\n"
         code += f"             (instr_rdata_i[19:15] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
@@ -389,7 +389,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += "  // S-type instructions (STORE): rs1, rs2 (no rd)\n"
         code += "  wire is_s_type = (instr_rdata_i[6:2] == 5'b01000);    // STORE\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || !is_s_type ||\n"
+        code += f"    assume ((instr_rdata_i[1:0] != 2'b11) || !is_s_type ||\n"
         code += f"            ((instr_rdata_i[19:15] <= 5'd{max_reg}) &&  // rs1\n"
         code += f"             (instr_rdata_i[24:20] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
@@ -398,7 +398,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += "  // B-type instructions (BRANCH): rs1, rs2 (no rd)\n"
         code += "  wire is_b_type = (instr_rdata_i[6:2] == 5'b11000);    // BRANCH\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || !is_b_type ||\n"
+        code += f"    assume ((instr_rdata_i[1:0] != 2'b11) || !is_b_type ||\n"
         code += f"            ((instr_rdata_i[19:15] <= 5'd{max_reg}) &&  // rs1\n"
         code += f"             (instr_rdata_i[24:20] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
@@ -408,7 +408,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += "  wire is_u_type = (instr_rdata_i[6:2] == 5'b01101) ||  // LUI\n"
         code += "                   (instr_rdata_i[6:2] == 5'b00101);    // AUIPC\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || !is_u_type ||\n"
+        code += f"    assume ((instr_rdata_i[1:0] != 2'b11) || !is_u_type ||\n"
         code += f"            (instr_rdata_i[11:7] <= 5'd{max_reg}));\n"
         code += "  end\n\n"
 
@@ -416,7 +416,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += "  // J-type instructions (JAL): rd only\n"
         code += "  wire is_j_type = (instr_rdata_i[6:2] == 5'b11011);    // JAL\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || !is_j_type ||\n"
+        code += f"    assume ((instr_rdata_i[1:0] != 2'b11) || !is_j_type ||\n"
         code += f"            (instr_rdata_i[11:7] <= 5'd{max_reg}));\n"
         code += "  end\n\n"
 
@@ -453,7 +453,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         if valid_patterns:
             code += "  // Instruction must match one of these valid patterns (OR of all valid instructions)\n"
             code += "  always_comb begin\n"
-            code += "    assume (!rst_ni || instr_is_compressed_i || (\n"
+            code += "    assume ((instr_rdata_i[1:0] != 2'b11) || (\n"
 
             # Generate OR of all valid instruction patterns
             for i, (pattern, mask, desc) in enumerate(valid_patterns):
@@ -500,7 +500,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         for pattern, mask, desc in patterns_32bit:
             code += f"  // {desc}: Pattern=0x{pattern:08x}, Mask=0x{mask:08x}\n"
             code += f"  always_comb begin\n"
-            code += f"    assume (!rst_ni || instr_is_compressed_i || ((instr_rdata_i[31:0] & 32'h{mask:08x}) != 32'h{pattern:08x}));\n"
+            code += f"    assume ((instr_rdata_i[1:0] != 2'b11) || ((instr_rdata_i[31:0] & 32'h{mask:08x}) != 32'h{pattern:08x}));\n"
             code += f"  end\n\n"
 
     # Generate constraints for 16-bit compressed instructions
@@ -510,7 +510,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         for pattern, mask, desc in patterns_16bit:
             code += f"  // {desc}: Pattern=0x{pattern:04x}, Mask=0x{mask:04x}\n"
             code += f"  always_comb begin\n"
-            code += f"    assume (!rst_ni || !instr_is_compressed_i || ((instr_rdata_i[15:0] & 16'h{mask:04x}) != 16'h{pattern:04x}));\n"
+            code += f"    assume ((instr_rdata_i[1:0] == 2'b11) || ((instr_rdata_i[15:0] & 16'h{mask:04x}) != 16'h{pattern:04x}));\n"
             code += f"  end\n\n"
 
     return code
