@@ -21,11 +21,14 @@ Examples:
   # Parse and validate a DSL file
   python -m pdat_dsl parse examples/example_16reg.dsl
 
-  # Generate SystemVerilog checker module
+  # Generate inline SystemVerilog assumptions (default: Ibex core)
   python -m pdat_dsl codegen examples/example_16reg.dsl output.sv
 
-  # Generate inline SystemVerilog assumptions
-  python -m pdat_dsl codegen --inline examples/example_16reg.dsl output.sv
+  # Generate for a specific core
+  python -m pdat_dsl codegen --target boom examples/example.dsl output.sv
+
+  # Use custom core configuration
+  python -m pdat_dsl codegen --config mycore.yaml examples/example.dsl output.sv
 
 For more information, visit: https://github.com/yourusername/PdatDsl
         """
@@ -48,23 +51,19 @@ For more information, visit: https://github.com/yourusername/PdatDsl
     # Codegen command
     codegen_parser = subparsers.add_parser(
         "codegen",
-        help="Generate SystemVerilog from DSL"
+        help="Generate inline SystemVerilog assumptions from DSL"
     )
     codegen_parser.add_argument("input_file", help="DSL file to process")
-    codegen_parser.add_argument("output_file", help="Output SystemVerilog file")
+    codegen_parser.add_argument("output_file", help="Output SystemVerilog file (inline assumptions)")
     codegen_parser.add_argument(
-        "--inline",
-        action="store_true",
-        help="Generate inline assumptions (not a module)"
+        "--config",
+        type=Path,
+        help="Core configuration YAML file (default: builtin Ibex config)"
     )
     codegen_parser.add_argument(
-        "-m", "--module-name",
-        default="instr_outlawed_checker",
-        help="Name of generated module (default: instr_outlawed_checker)"
-    )
-    codegen_parser.add_argument(
-        "-b", "--bind-file",
-        help="Output bind file (default: <output_file_base>_bind.sv)"
+        "--target",
+        choices=["ibex", "boom", "rocket"],
+        help="Target core shortcut (ibex, boom, rocket)"
     )
 
     # Test command
@@ -96,23 +95,6 @@ For more information, visit: https://github.com/yourusername/PdatDsl
     find_corr_parser.add_argument("--report", help="Optional text report file")
     find_corr_parser.add_argument("-v", "--verbose", action="store_true")
 
-    # SMT constraints command
-    smt_parser = subparsers.add_parser(
-        "smt-constraints",
-        help="Generate SMT2 constraints from DSL"
-    )
-    smt_parser.add_argument("input_file", help="DSL file")
-    smt_parser.add_argument("output_file", nargs="?", help="Output SMT2 file (optional)")
-
-    # Random constraints command (for VCS testbenches)
-    random_parser = subparsers.add_parser(
-        "random-constraints",
-        help="Generate SystemVerilog randomization constraints from DSL"
-    )
-    random_parser.add_argument("input_file", help="DSL file")
-    random_parser.add_argument("output_file", help="Output SystemVerilog constraint class")
-    random_parser.add_argument("-v", "--verbose", action="store_true")
-
     # Version command
     version_parser = subparsers.add_parser(
         "version",
@@ -137,12 +119,10 @@ For more information, visit: https://github.com/yourusername/PdatDsl
     elif args.command == "codegen":
         from .codegen import main as codegen_main
         sys.argv = ["pdat-dsl", args.input_file, args.output_file]
-        if args.inline:
-            sys.argv.append("--inline")
-        if args.module_name != "instr_outlawed_checker":
-            sys.argv.extend(["-m", args.module_name])
-        if args.bind_file:
-            sys.argv.extend(["-b", args.bind_file])
+        if hasattr(args, 'config') and args.config:
+            sys.argv.extend(["--config", str(args.config)])
+        if hasattr(args, 'target') and args.target:
+            sys.argv.extend(["--target", args.target])
         return codegen_main()
 
     elif args.command == "test":
@@ -183,21 +163,6 @@ For more information, visit: https://github.com/yourusername/PdatDsl
         if args.verbose:
             sys.argv.append("-v")
         return find_signal_correspondences.main()
-
-    elif args.command == "smt-constraints":
-        from . import smt_constraints
-        if args.output_file:
-            sys.argv = ["pdat-dsl", args.input_file, args.output_file]
-        else:
-            sys.argv = ["pdat-dsl", args.input_file]
-        return smt_constraints.main()
-
-    elif args.command == "random-constraints":
-        from . import random_constraints
-        sys.argv = ["pdat-dsl", args.input_file, args.output_file]
-        if args.verbose:
-            sys.argv.append("-v")
-        return random_constraints.main()
 
     elif args.command == "version":
         from . import __version__

@@ -1,0 +1,33 @@
+# BOOM Core Configuration (Berkeley Out-of-Order Machine)
+# https://github.com/riscv-boom/riscv-boom
+#
+# This is an EXAMPLE configuration for BOOM. Signal names may need
+# adjustment based on your specific BOOM version and configuration.
+#
+# Note: BOOM is out-of-order, so operand signals may be at different
+# pipeline stages than Ibex. This config assumes EX stage signals.
+
+core_name: "boom"
+architecture: "rv64"  # BOOM supports RV64GC
+
+# Signal naming conventions for BOOM (example - verify against your BOOM version)
+signals:
+  # Instruction and PC signals
+  instruction_data: "dec_uops_0_inst"  # Decoded instruction
+  pc: "exe_pc_0"
+
+  # Operand signals (BOOM has register read stage)
+  operands:
+    # ALU/general execution units
+    alu:
+      rs1: "exe_rs1_data_0"
+      rs2: "exe_rs2_data_0"
+
+    # Multiply/Divide (may use same datapath in BOOM)
+    multdiv:
+      rs1: "exe_rs1_data_0"
+      rs2: "exe_rs2_data_0"
+
+# VCD analysis configuration
+vcd:
+  testbench_prefix: "TestHarness.dut"

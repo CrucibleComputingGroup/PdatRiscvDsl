@@ -1,0 +1,30 @@
+# Ibex Core Configuration
+# https://github.com/lowRISC/ibex
+#
+# This configuration file specifies signal names and hierarchy details
+# for the lowRISC Ibex RISC-V core.
+
+core_name: "ibex"
+architecture: "rv32"  # Ibex is RV32IMC
+
+# Signal naming conventions for Ibex
+signals:
+  # Instruction and PC signals
+  instruction_data: "instr_rdata_i"
+  pc: "pc_if_o"
+
+  # Operand signals by execution unit
+  operands:
+    # ALU operands (used by most arithmetic/logic instructions)
+    alu:
+      rs1: "alu_operand_a_ex_i"
+      rs2: "alu_operand_b_ex_i"
+
+    # Multiply/Divide unit operands
+    multdiv:
+      rs1: "multdiv_operand_a_ex_i"
+      rs2: "multdiv_operand_b_ex_i"
+
+# VCD analysis configuration
+vcd:
+  testbench_prefix: "tb_ibex_random.dut"

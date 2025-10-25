@@ -1,0 +1,30 @@
+# Rocket Core Configuration
+# https://github.com/chipsalliance/rocket-chip
+#
+# This is an EXAMPLE configuration for Rocket Core. Signal names may
+# need adjustment based on your specific Rocket configuration.
+
+core_name: "rocket"
+architecture: "rv64"  # Rocket supports RV64GC
+
+# Signal naming conventions for Rocket (example - verify against your Rocket version)
+signals:
+  # Instruction and PC signals
+  instruction_data: "ibuf_io_inst_0_bits_inst_bits"
+  pc: "ibuf_io_pc"
+
+  # Operand signals (Rocket reads from register file)
+  operands:
+    # ALU operations
+    alu:
+      rs1: "id_rs_0"
+      rs2: "id_rs_1"
+
+    # Multiply/Divide
+    multdiv:
+      rs1: "div_io_req_bits_in1"
+      rs2: "div_io_req_bits_in2"
+
+# VCD analysis configuration
+vcd:
+  testbench_prefix: "TestHarness.dut.tile_prci_domain.tile_reset_domain.tile"
