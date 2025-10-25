@@ -117,6 +117,7 @@ module {module_name} (
   input logic [31:0] instr_rdata_i,
   input logic        instr_is_compressed_i
 );
+"""
 
     if needs_operands:
         sv_code += """,
