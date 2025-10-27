@@ -66,6 +66,47 @@ For more information, visit: https://github.com/yourusername/PdatDsl
         "-b", "--bind-file",
         help="Output bind file (default: <output_file_base>_bind.sv)"
     )
+    
+    # Timing constraint arguments
+    codegen_parser.add_argument(
+        "--timing",
+        action="store_true",
+        help="Enable cache-aware timing constraints"
+    )
+    codegen_parser.add_argument(
+        "--timing-output",
+        help="Output file for timing constraints (default: <output_base>_timing.sv)"
+    )
+    codegen_parser.add_argument(
+        "--instr-hit-latency",
+        type=int,
+        default=1,
+        help="Max cycles for instruction cache hit (default: 1)"
+    )
+    codegen_parser.add_argument(
+        "--instr-miss-latency",
+        type=int,
+        default=5,
+        help="Max cycles for instruction cache miss (default: 5)"
+    )
+    codegen_parser.add_argument(
+        "--data-hit-latency",
+        type=int,
+        default=1,
+        help="Max cycles for data cache hit (default: 1)"
+    )
+    codegen_parser.add_argument(
+        "--data-miss-latency",
+        type=int,
+        default=4,
+        help="Max cycles for data cache miss (default: 4)"
+    )
+    codegen_parser.add_argument(
+        "--locality-bits",
+        type=int,
+        default=7,
+        help="Number of address high bits for locality detection (default: 7)"
+    )
 
     # Test command
     test_parser = subparsers.add_parser(
@@ -143,6 +184,20 @@ For more information, visit: https://github.com/yourusername/PdatDsl
             sys.argv.extend(["-m", args.module_name])
         if args.bind_file:
             sys.argv.extend(["-b", args.bind_file])
+        if args.timing:
+            sys.argv.append("--timing")
+        if args.timing_output:
+            sys.argv.extend(["--timing-output", args.timing_output])
+        if args.instr_hit_latency != 1:
+            sys.argv.extend(["--instr-hit-latency", str(args.instr_hit_latency)])
+        if args.instr_miss_latency != 5:
+            sys.argv.extend(["--instr-miss-latency", str(args.instr_miss_latency)])
+        if args.data_hit_latency != 1:
+            sys.argv.extend(["--data-hit-latency", str(args.data_hit_latency)])
+        if args.data_miss_latency != 4:
+            sys.argv.extend(["--data-miss-latency", str(args.data_miss_latency)])
+        if args.locality_bits != 7:
+            sys.argv.extend(["--locality-bits", str(args.locality_bits)])
         return codegen_main()
 
     elif args.command == "test":
