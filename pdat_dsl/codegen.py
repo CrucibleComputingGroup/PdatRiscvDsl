@@ -141,9 +141,7 @@ module {module_name} (
   input logic        rst_ni,
   input logic        instr_valid_i,
   input logic [31:0] instr_rdata_i,
-  input logic        instr_is_compressed_i
-);
-"""
+  input logic        instr_is_compressed_i"""
 
     if needs_operands:
         sv_code += """,
@@ -156,7 +154,17 @@ module {module_name} (
     sv_code += "\n);\n\n"
 
     # Group by width (assume all 32-bit for now, can add 16-bit later)
-    patterns_32 = [(p, m, d) for p, m, d in patterns if m <= 0xFFFFFFFF]
+    # Handle both 3-tuple and 4-tuple formats (with is_compressed flag)
+    patterns_32 = []
+    for item in patterns:
+        if len(item) == 4:
+            p, m, d, is_compressed = item
+            if m <= 0xFFFFFFFF:
+                patterns_32.append((p, m, d))
+        else:
+            p, m, d = item
+            if m <= 0xFFFFFFFF:
+                patterns_32.append((p, m, d))
 
     if patterns_32:
         sv_code += "  // 32-bit outlawed instruction patterns\n"
@@ -282,6 +290,115 @@ def generate_dtype_assertions(rules: List[InstructionRule]) -> str:
                 code += f"  end\n\n"
 
     return code
+
+def generate_timing_constraints(instr_hit_latency: int = 1, instr_miss_latency: int = 5,
+                                data_hit_latency: int = 1, data_miss_latency: int = 4,
+                                locality_bits: int = 7) -> str:
+    """
+    Generate SystemVerilog timing constraints for cache-aware optimization.
+    
+    Args:
+        instr_hit_latency: Max cycles for instruction cache hit (default: 1)
+        instr_miss_latency: Max cycles for instruction cache miss (default: 5)
+        data_hit_latency: Max cycles for data cache hit (default: 1)
+        data_miss_latency: Max cycles for data cache miss (default: 4)
+        locality_bits: Number of address high bits for locality detection (default: 7)
+    
+    Returns:
+        SystemVerilog code with timing constraints
+    """
+    code = f"""
+  // ========================================
+  // Cache-Aware Timing Constraints
+  // ========================================
+  // Models realistic cache hit/miss behavior for ABC optimization
+  // Injected at ibex_core level for full signal visibility
+
+  // Instruction cache timing tracking
+  logic [2:0] instr_stall_counter_q;
+  logic instr_likely_miss;
+  logic [{locality_bits-1}:0] instr_last_cache_line_q;  // Only upper {locality_bits} bits [31:{32-locality_bits}] - minimal overhead
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+      instr_stall_counter_q <= 3'b0;
+      instr_likely_miss <= 1'b0;
+      instr_last_cache_line_q <= {locality_bits}'b0;
+    end else begin
+      if (instr_req_o && !instr_gnt_i) begin
+        instr_stall_counter_q <= instr_stall_counter_q + 1;
+        // After 1 cycle of stalling, assume cache miss
+        instr_likely_miss <= (instr_stall_counter_q >= 1);
+      end else begin
+        instr_stall_counter_q <= 3'b0;
+        instr_likely_miss <= 1'b0;
+      end
+
+      if (instr_gnt_i) begin
+        instr_last_cache_line_q <= instr_addr_o[31:{32-locality_bits}];  // Only upper bits
+      end
+    end
+  end
+
+  // Data cache timing tracking
+  logic [2:0] data_stall_counter_q;
+  logic data_likely_miss;
+  logic [{locality_bits-1}:0] data_last_cache_line_q;  // Only upper {locality_bits} bits [31:{32-locality_bits}] - minimal overhead
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+      data_stall_counter_q <= 3'b0;
+      data_likely_miss <= 1'b0;
+      data_last_cache_line_q <= {locality_bits}'b0;
+    end else begin
+      if (data_req_out && !data_gnt_i) begin
+        data_stall_counter_q <= data_stall_counter_q + 1;
+        data_likely_miss <= (data_stall_counter_q >= 1);
+      end else if (data_rvalid_i) begin
+        data_stall_counter_q <= 3'b0;
+        data_likely_miss <= 1'b0;
+      end
+
+      if (data_gnt_i) begin
+        data_last_cache_line_q <= data_addr_o[31:{32-locality_bits}];  // Only upper bits
+      end
+    end
+  end
+
+  // Check locality (same upper address bits = likely sequential/same region)
+  wire instr_same_line = (instr_addr_o[31:{32-locality_bits}] == instr_last_cache_line_q);
+  wire data_same_line = (data_addr_o[31:{32-locality_bits}] == data_last_cache_line_q);
+
+  // Cache-aware timing assumptions
+  always_comb begin
+    if (rst_ni) begin
+      // Instruction cache: different bounds for hit vs miss
+      if (instr_same_line && !instr_likely_miss) begin
+        assume(instr_stall_counter_q <= 3'd{instr_hit_latency});  // Cache hit: {instr_hit_latency} cycle max
+      end else begin
+        assume(instr_stall_counter_q <= 3'd{instr_miss_latency});  // Cache miss: up to {instr_miss_latency} cycles
+      end
+
+      // Data cache: different bounds for hit vs miss
+      if (data_same_line && !data_likely_miss) begin
+        assume(data_stall_counter_q <= 3'd{data_hit_latency});   // Cache hit: {data_hit_latency} cycle max
+      end else begin
+        assume(data_stall_counter_q <= 3'd{data_miss_latency});   // Cache miss: up to {data_miss_latency} cycles
+      end
+
+      // Force completion at maximum latency
+      if (instr_stall_counter_q == 3'd{instr_miss_latency}) begin
+        assume(instr_gnt_i);  // Must grant at max stall
+      end
+
+      if (data_stall_counter_q == 3'd{data_miss_latency}) begin
+        assume(data_gnt_i);  // Must grant at max stall
+      end
+    end
+  end
+"""
+    return code
+
 
 def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
                                register_constraint: Optional[RegisterConstraintRule] = None):
@@ -475,6 +592,22 @@ def main():
                        help='Name of generated module (default: instr_outlawed_checker)')
     parser.add_argument('-b', '--bind-file',
                        help='Output bind file (default: <output_file_base>_bind.sv)')
+    
+    # Timing constraint arguments
+    parser.add_argument('--timing', action='store_true',
+                       help='Enable cache-aware timing constraints')
+    parser.add_argument('--timing-output', 
+                       help='Output file for timing constraints (default: <output_base>_timing.sv)')
+    parser.add_argument('--instr-hit-latency', type=int, default=1,
+                       help='Max cycles for instruction cache hit (default: 1)')
+    parser.add_argument('--instr-miss-latency', type=int, default=5,
+                       help='Max cycles for instruction cache miss (default: 5)')
+    parser.add_argument('--data-hit-latency', type=int, default=1,
+                       help='Max cycles for data cache hit (default: 1)')
+    parser.add_argument('--data-miss-latency', type=int, default=4,
+                       help='Max cycles for data cache miss (default: 4)')
+    parser.add_argument('--locality-bits', type=int, default=7,
+                       help='Number of address high bits for locality detection (default: 7)')
 
     args = parser.parse_args()
 
@@ -531,6 +664,31 @@ def main():
         with open(args.output_file, 'w') as f:
             f.write(code)
         print(f"Successfully wrote inline assumptions to {args.output_file}")
+        
+        # Generate separate timing constraints file if enabled (for ibex_core.sv)
+        if args.timing:
+            print(f"Generating cache-aware timing constraints...")
+            timing_code = generate_timing_constraints(
+                instr_hit_latency=args.instr_hit_latency,
+                instr_miss_latency=args.instr_miss_latency,
+                data_hit_latency=args.data_hit_latency,
+                data_miss_latency=args.data_miss_latency,
+                locality_bits=args.locality_bits
+            )
+            
+            # Determine timing output file
+            if args.timing_output:
+                timing_output = args.timing_output
+            else:
+                # Default: replace .sv with _timing.sv
+                if args.output_file.endswith('.sv'):
+                    timing_output = args.output_file[:-3] + '_timing.sv'
+                else:
+                    timing_output = args.output_file + '_timing.sv'
+            
+            with open(timing_output, 'w') as f:
+                f.write(timing_code)
+            print(f"Successfully wrote timing constraints to {timing_output}")
     else:
         # Generate full module + bind file
         # Determine bind file name
