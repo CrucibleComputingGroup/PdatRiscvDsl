@@ -115,8 +115,7 @@ module {module_name} (
   input logic        rst_ni,
   input logic        instr_valid_i,
   input logic [31:0] instr_rdata_i,
-  input logic        instr_is_compressed_i
-);
+  input logic        instr_is_compressed_i"""
 
     if needs_operands:
         sv_code += """,
@@ -129,8 +128,18 @@ module {module_name} (
     sv_code += "\n);\n\n"
 
     # Group by width (assume all 32-bit for now, can add 16-bit later)
-    patterns_32 = [(p, m, d) for p, m, d in patterns if m <= 0xFFFFFFFF]
-
+    # patterns_32 = [(p, m, d) for p, m, d in patterns if m <= 0xFFFFFFFF]
+    patterns_32 = []
+    for item in patterns:
+        if len(item) == 4:
+            p, m, d, is_compressed = item
+            if m <= 0xFFFFFFFF:
+                patterns_32.append((p, m, d))
+        else:
+            p, m, d = item
+            if m <= 0xFFFFFFFF:
+                patterns_32.append((p, m, d))
+                
     if patterns_32:
         sv_code += "  // 32-bit outlawed instruction patterns\n"
         sv_code += "  // Using combinational 'assume' so ABC can use them as don't-care conditions\n"
