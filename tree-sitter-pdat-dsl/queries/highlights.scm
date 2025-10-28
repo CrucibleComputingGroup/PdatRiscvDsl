@@ -31,9 +31,14 @@
 ; Wildcards
 (wildcard) @constant.builtin
 
+; Data types
+(data_type) @type.builtin
+
 ; Operators
 "=" @operator
 "-" @operator
+"|" @operator
+"~" @operator
 
 ; Delimiters
 ["{" "}"] @punctuation.bracket

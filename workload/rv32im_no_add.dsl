@@ -5,6 +5,6 @@
 require RV32I
 require RV32M
 
-# Outlaw all multiply and divide instructions (RV32M extension)
-# Even though RV32M is required above, these specific instructions are outlawed
+# Outlaw the ADD instruction (from RV32I extension)
+# Even though RV32M is required above, the ADD instruction is outlawed as an example
 instruction ADD
