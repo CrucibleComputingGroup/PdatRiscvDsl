@@ -11,8 +11,6 @@ require_registers x0-x15
 # (Even though we don't require RV32M, we can be explicit)
 instruction MUL
 instruction MULH
-instruction MULHSU
-instruction MULHU
 instruction DIV
 instruction DIVU
 instruction REM

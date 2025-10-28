@@ -1,0 +1,1 @@
+require RV32I
