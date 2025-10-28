@@ -40,27 +40,61 @@ def generate_valid_instruction_constraint(required_extensions: Set[str]) -> str:
         return ""
 
     # Collect all valid instruction patterns from required extensions
-    valid_instrs = []
+    valid_instrs_32bit = []
+    valid_instrs_16bit = []
     for ext in sorted(required_extensions):
         ext_instrs = get_extension_instructions(ext)
         if ext_instrs:
-            valid_instrs.extend(ext_instrs.values())
+            for instr in ext_instrs.values():
+                if instr.is_compressed:
+                    valid_instrs_16bit.append(instr)
+                else:
+                    valid_instrs_32bit.append(instr)
 
-    if not valid_instrs:
+    if not valid_instrs_32bit and not valid_instrs_16bit:
         return ""
 
-    # Generate constraint: instr must match one of the valid patterns
     constraint = "    // Valid instruction encodings from required extensions\n"
     constraint += "    constraint valid_encoding {\n"
 
-    # Create a big OR of all valid patterns
-    for i, instr in enumerate(valid_instrs):
-        if i == 0:
-            constraint += f"      ((instr_word & 32'h{instr.base_mask:08X}) == 32'h{instr.base_pattern:08X})"
-        else:
-            constraint += f" ||\n      ((instr_word & 32'h{instr.base_mask:08X}) == 32'h{instr.base_pattern:08X})"
+    # Build separate constraints for 32-bit and 16-bit instructions
+    if valid_instrs_32bit and valid_instrs_16bit:
+        # Mixed: need to check bits[1:0] and route to appropriate pattern
+        constraint += "      (instr_word[1:0] == 2'b11) -> (\n"
+        for i, instr in enumerate(valid_instrs_32bit):
+            if i == 0:
+                constraint += f"        ((instr_word & 32'h{instr.base_mask:08X}) == 32'h{instr.base_pattern:08X})"
+            else:
+                constraint += f" ||\n        ((instr_word & 32'h{instr.base_mask:08X}) == 32'h{instr.base_pattern:08X})"
+        constraint += "\n      );\n"
 
-    constraint += ";\n    }\n\n"
+        constraint += "      (instr_word[1:0] != 2'b11) -> (\n"
+        for i, instr in enumerate(valid_instrs_16bit):
+            if i == 0:
+                constraint += f"        ((instr_word[15:0] & 16'h{instr.base_mask:04X}) == 16'h{instr.base_pattern:04X})"
+            else:
+                constraint += f" ||\n        ((instr_word[15:0] & 16'h{instr.base_mask:04X}) == 16'h{instr.base_pattern:04X})"
+        constraint += "\n      );\n"
+    elif valid_instrs_32bit:
+        # Only 32-bit instructions
+        constraint += "      instr_word[1:0] == 2'b11;\n"
+        for i, instr in enumerate(valid_instrs_32bit):
+            if i == 0:
+                constraint += "      ((instr_word & 32'h{instr.base_mask:08X}) == 32'h{instr.base_pattern:08X})"
+            else:
+                constraint += " ||\n      ((instr_word & 32'h{instr.base_mask:08X}) == 32'h{instr.base_pattern:08X})"
+        constraint += ";\n"
+    else:
+        # Only 16-bit instructions
+        constraint += "      instr_word[1:0] != 2'b11;\n"
+        for i, instr in enumerate(valid_instrs_16bit):
+            if i == 0:
+                constraint += "      ((instr_word[15:0] & 16'h{instr.base_mask:04X}) == 16'h{instr.base_pattern:04X})"
+            else:
+                constraint += " ||\n      ((instr_word[15:0] & 16'h{instr.base_mask:04X}) == 16'h{instr.base_pattern:04X})"
+        constraint += ";\n"
+
+    constraint += "    }\n\n"
     return constraint
 
 def generate_outlawed_instruction_constraints(patterns: List[Tuple[int, int, str]]) -> str:

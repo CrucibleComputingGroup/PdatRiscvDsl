@@ -12,8 +12,9 @@ class InstructionEncoding:
     name: str
     base_pattern: int  # Base encoding with all fields as 0
     base_mask: int     # Mask for fixed bits (opcode, funct3, funct7, etc.)
-    format: str        # R, I, S, B, U, J
+    format: str        # R, I, S, B, U, J (or CR, CI, CSS, etc. for compressed)
     fields: Dict[str, Tuple[int, int]]  # field_name -> (bit_position, width)
+    is_compressed: bool = False  # True for 16-bit compressed instructions
 
 # RISC-V instruction formats and their field layouts
 # Format: field_name -> (lsb_position, width)
@@ -68,6 +69,88 @@ J_TYPE_FIELDS = {
     "imm_11": (20, 1),
     "imm_1_10": (21, 10),
     "imm_20": (31, 1),
+}
+
+# Compressed instruction formats (16-bit)
+# Format: field_name -> (lsb_position, width)
+
+# CR-type: Register (used for mv, add, jalr, jr)
+CR_TYPE_FIELDS = {
+    "op": (0, 2),       # Always != 11 for compressed
+    "rs2": (2, 5),
+    "rd_rs1": (7, 5),   # rd and rs1 are the same register
+    "funct4": (12, 4),
+}
+
+# CI-type: Immediate (used for addi, li, lui, addi16sp, slli, lwsp)
+CI_TYPE_FIELDS = {
+    "op": (0, 2),
+    "imm_lo": (2, 5),
+    "rd_rs1": (7, 5),
+    "imm_hi": (12, 1),
+    "funct3": (13, 3),
+}
+
+# CSS-type: Stack-relative Store (used for swsp)
+CSS_TYPE_FIELDS = {
+    "op": (0, 2),
+    "rs2": (2, 5),
+    "imm": (7, 6),
+    "funct3": (13, 3),
+}
+
+# CIW-type: Wide Immediate (used for addi4spn)
+CIW_TYPE_FIELDS = {
+    "op": (0, 2),
+    "rd_prime": (2, 3),  # Compressed register (maps to x8-x15)
+    "imm": (5, 8),
+    "funct3": (13, 3),
+}
+
+# CL-type: Load (used for lw)
+CL_TYPE_FIELDS = {
+    "op": (0, 2),
+    "rd_prime": (2, 3),
+    "imm_lo": (5, 2),
+    "rs1_prime": (7, 3),
+    "imm_hi": (10, 3),
+    "funct3": (13, 3),
+}
+
+# CS-type: Store (used for sw)
+CS_TYPE_FIELDS = {
+    "op": (0, 2),
+    "rs2_prime": (2, 3),
+    "imm_lo": (5, 2),
+    "rs1_prime": (7, 3),
+    "imm_hi": (10, 3),
+    "funct3": (13, 3),
+}
+
+# CA-type: Arithmetic (used for sub, xor, or, and)
+CA_TYPE_FIELDS = {
+    "op": (0, 2),
+    "rs2_prime": (2, 3),
+    "funct2": (5, 2),
+    "rd_rs1_prime": (7, 3),
+    "funct6": (10, 6),
+}
+
+# CB-type: Branch (used for beqz, bnez, srli, srai, andi)
+CB_TYPE_FIELDS = {
+    "op": (0, 2),
+    "offset_lo": (2, 3),
+    "offset_mid": (5, 2),
+    "rs1_prime": (7, 3),
+    "offset_hi": (10, 3),
+    "funct3": (13, 3),
+}
+
+# CJ-type: Jump (used for j, jal)
+CJ_TYPE_FIELDS = {
+    "op": (0, 2),
+    "jump_target": (2, 11),
+    "funct3": (13, 3),
 }
 
 # RV32I Base Instruction Set
@@ -191,6 +274,59 @@ RV64M_INSTRUCTIONS = {
     "REMUW": InstructionEncoding("REMUW", 0x0200703B, 0xFE00707F, "R", R_TYPE_FIELDS),
 }
 
+# RV32C Extension (Compressed Instructions)
+# Note: All compressed instructions have bits[1:0] != 11
+RV32C_INSTRUCTIONS = {
+    # Quadrant 0 (op = 00)
+    "C.ADDI4SPN": InstructionEncoding("C.ADDI4SPN", 0x0000, 0xE003, "CIW", CIW_TYPE_FIELDS, True),
+    "C.LW":       InstructionEncoding("C.LW",       0x4000, 0xE003, "CL",  CL_TYPE_FIELDS, True),
+    "C.SW":       InstructionEncoding("C.SW",       0xC000, 0xE003, "CS",  CS_TYPE_FIELDS, True),
+
+    # Quadrant 1 (op = 01)
+    "C.NOP":      InstructionEncoding("C.NOP",      0x0001, 0xFFFF, "CI",  CI_TYPE_FIELDS, True),  # Special case of C.ADDI
+    "C.ADDI":     InstructionEncoding("C.ADDI",     0x0001, 0xE003, "CI",  CI_TYPE_FIELDS, True),
+    "C.JAL":      InstructionEncoding("C.JAL",      0x2001, 0xE003, "CJ",  CJ_TYPE_FIELDS, True),  # RV32 only
+    "C.LI":       InstructionEncoding("C.LI",       0x4001, 0xE003, "CI",  CI_TYPE_FIELDS, True),
+    "C.ADDI16SP": InstructionEncoding("C.ADDI16SP", 0x6101, 0xEF83, "CI",  CI_TYPE_FIELDS, True),  # rd/rs1 = x2
+    "C.LUI":      InstructionEncoding("C.LUI",      0x6001, 0xE003, "CI",  CI_TYPE_FIELDS, True),
+    "C.SRLI":     InstructionEncoding("C.SRLI",     0x8001, 0xEC03, "CB",  CB_TYPE_FIELDS, True),
+    "C.SRAI":     InstructionEncoding("C.SRAI",     0x8401, 0xEC03, "CB",  CB_TYPE_FIELDS, True),
+    "C.ANDI":     InstructionEncoding("C.ANDI",     0x8801, 0xEC03, "CB",  CB_TYPE_FIELDS, True),
+    "C.SUB":      InstructionEncoding("C.SUB",      0x8C01, 0xFC63, "CA",  CA_TYPE_FIELDS, True),
+    "C.XOR":      InstructionEncoding("C.XOR",      0x8C21, 0xFC63, "CA",  CA_TYPE_FIELDS, True),
+    "C.OR":       InstructionEncoding("C.OR",       0x8C41, 0xFC63, "CA",  CA_TYPE_FIELDS, True),
+    "C.AND":      InstructionEncoding("C.AND",      0x8C61, 0xFC63, "CA",  CA_TYPE_FIELDS, True),
+    "C.J":        InstructionEncoding("C.J",        0xA001, 0xE003, "CJ",  CJ_TYPE_FIELDS, True),
+    "C.BEQZ":     InstructionEncoding("C.BEQZ",     0xC001, 0xE003, "CB",  CB_TYPE_FIELDS, True),
+    "C.BNEZ":     InstructionEncoding("C.BNEZ",     0xE001, 0xE003, "CB",  CB_TYPE_FIELDS, True),
+
+    # Quadrant 2 (op = 10)
+    "C.SLLI":     InstructionEncoding("C.SLLI",     0x0002, 0xE003, "CI",  CI_TYPE_FIELDS, True),
+    "C.LWSP":     InstructionEncoding("C.LWSP",     0x4002, 0xE003, "CI",  CI_TYPE_FIELDS, True),
+    "C.JR":       InstructionEncoding("C.JR",       0x8002, 0xF07F, "CR",  CR_TYPE_FIELDS, True),  # rs2 = 0
+    "C.MV":       InstructionEncoding("C.MV",       0x8002, 0xF003, "CR",  CR_TYPE_FIELDS, True),
+    "C.EBREAK":   InstructionEncoding("C.EBREAK",   0x9002, 0xFFFF, "CR",  CR_TYPE_FIELDS, True),
+    "C.JALR":     InstructionEncoding("C.JALR",     0x9002, 0xF07F, "CR",  CR_TYPE_FIELDS, True),  # rs2 = 0
+    "C.ADD":      InstructionEncoding("C.ADD",      0x9002, 0xF003, "CR",  CR_TYPE_FIELDS, True),
+    "C.SWSP":     InstructionEncoding("C.SWSP",     0xC002, 0xE003, "CSS", CSS_TYPE_FIELDS, True),
+}
+
+# RV64C Extension (Compressed Instructions for RV64)
+RV64C_INSTRUCTIONS = {
+    # Additional quadrant 0 (op = 00)
+    "C.LD":       InstructionEncoding("C.LD",       0x6000, 0xE003, "CL",  CL_TYPE_FIELDS, True),
+    "C.SD":       InstructionEncoding("C.SD",       0xE000, 0xE003, "CS",  CS_TYPE_FIELDS, True),
+
+    # Additional quadrant 1 (op = 01) - RV64 specific
+    "C.ADDIW":    InstructionEncoding("C.ADDIW",    0x2001, 0xE003, "CI",  CI_TYPE_FIELDS, True),  # RV64 replaces C.JAL
+    "C.SUBW":     InstructionEncoding("C.SUBW",     0x9C01, 0xFC63, "CA",  CA_TYPE_FIELDS, True),
+    "C.ADDW":     InstructionEncoding("C.ADDW",     0x9C21, 0xFC63, "CA",  CA_TYPE_FIELDS, True),
+
+    # Additional quadrant 2 (op = 10)
+    "C.LDSP":     InstructionEncoding("C.LDSP",     0x6002, 0xE003, "CI",  CI_TYPE_FIELDS, True),
+    "C.SDSP":     InstructionEncoding("C.SDSP",     0xE002, 0xE003, "CSS", CSS_TYPE_FIELDS, True),
+}
+
 # Combined instruction database
 ALL_INSTRUCTIONS = {
     **RV32I_INSTRUCTIONS,
@@ -199,6 +335,8 @@ ALL_INSTRUCTIONS = {
     **RV64M_INSTRUCTIONS,
     **PRIVILEGED_INSTRUCTIONS,
     **CSR_INSTRUCTIONS,
+    **RV32C_INSTRUCTIONS,
+    **RV64C_INSTRUCTIONS,
 }
 
 # Extension name to instruction set mapping
@@ -207,6 +345,8 @@ EXTENSION_MAP = {
     "RV32M": RV32M_INSTRUCTIONS,
     "RV64I": RV64I_INSTRUCTIONS,
     "RV64M": RV64M_INSTRUCTIONS,
+    "RV32C": RV32C_INSTRUCTIONS,
+    "RV64C": RV64C_INSTRUCTIONS,
     "PRIV": PRIVILEGED_INSTRUCTIONS,
     "ZICSR": CSR_INSTRUCTIONS,
 }

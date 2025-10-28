@@ -12,19 +12,30 @@ This script:
 import sys
 import argparse
 from typing import List, Tuple, Set, Optional
-from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule, DataTypeSet
+from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule, DataTypeSet, TimingConstraintRule
 from .encodings import (
     get_instruction_encoding, parse_register, set_field, create_field_mask,
     get_extension_instructions
 )
 from .dtype_codegen import generate_dtype_check_expr, generate_dtype_set_check_expr
 
-def instruction_rule_to_pattern(rule: InstructionRule) -> List[Tuple[int, int, str]]:
+def has_c_extension_required(rules: List) -> bool:
+    """Check if RV32C or RV64C extension is required in the rules."""
+    for rule in rules:
+        if isinstance(rule, RequireRule):
+            if rule.extension.upper() in ('RV32C', 'RV64C'):
+                return True
+    return False
+
+def instruction_rule_to_pattern(rule: InstructionRule, has_c_ext: bool = False) -> List[Tuple[int, int, str, bool]]:
     """
-    Convert an InstructionRule to one or more (pattern, mask, description) tuples.
+    Convert an InstructionRule to one or more (pattern, mask, description, is_compressed) tuples.
 
     Returns a list because some rules with wildcards might expand to multiple patterns.
+    When has_c_ext is True, auto-expands to include compressed versions of instructions.
     """
+    results = []
+
     # Get the base encoding for this instruction
     encoding = get_instruction_encoding(rule.name)
     if not encoding:
@@ -98,7 +109,22 @@ def instruction_rule_to_pattern(rule: InstructionRule) -> List[Tuple[int, int, s
         constraint_strs = [f"{c.field_name}={c.field_value}" for c in rule.constraints]
         desc += " { " + ", ".join(constraint_strs) + " }"
 
-    return [(pattern, mask, desc)]
+    # Add the base instruction pattern
+    results.append((pattern, mask, desc, encoding.is_compressed))
+
+    # If C extension is required and this is not already a compressed instruction,
+    # check if a compressed version exists and add it too
+    if has_c_ext and not encoding.is_compressed and not rule.name.startswith('C.'):
+        compressed_name = f"C.{rule.name}"
+        compressed_encoding = get_instruction_encoding(compressed_name)
+        if compressed_encoding:
+            # For compressed version, we don't apply field constraints since they're different formats
+            # Just outlaw the compressed version entirely
+            compressed_desc = f"{compressed_name} (auto-expanded from {rule.name})"
+            results.append((compressed_encoding.base_pattern, compressed_encoding.base_mask,
+                          compressed_desc, True))
+
+    return results
 
 def generate_sv_module(patterns: List[Tuple[int, int, str]], module_name: str = "instr_outlawed_checker",
                        dtype_assertions: str = "") -> str:
@@ -128,7 +154,7 @@ module {module_name} (
     sv_code += "\n);\n\n"
 
     # Group by width (assume all 32-bit for now, can add 16-bit later)
-    # patterns_32 = [(p, m, d) for p, m, d in patterns if m <= 0xFFFFFFFF]
+    # Handle both 3-tuple and 4-tuple formats (with is_compressed flag)
     patterns_32 = []
     for item in patterns:
         if len(item) == 4:
@@ -139,7 +165,6 @@ module {module_name} (
             p, m, d = item
             if m <= 0xFFFFFFFF:
                 patterns_32.append((p, m, d))
-                
     if patterns_32:
         sv_code += "  // 32-bit outlawed instruction patterns\n"
         sv_code += "  // Using combinational 'assume' so ABC can use them as don't-care conditions\n"
@@ -265,6 +290,158 @@ def generate_dtype_assertions(rules: List[InstructionRule]) -> str:
 
     return code
 
+def generate_timing_constraints(instr_hit_latency, instr_miss_latency,
+                                data_hit_latency, data_miss_latency,
+                                locality_bits) -> str:
+    """
+    Generate SystemVerilog timing constraints for cache-aware optimization.
+    
+    Args:
+        instr_hit_latency: Max cycles for instruction cache hit (-1 to disable)
+        instr_miss_latency: Max cycles for instruction cache miss (-1 to disable)
+        data_hit_latency: Max cycles for data cache hit (-1 to disable)
+        data_miss_latency: Max cycles for data cache miss (-1 to disable)
+        locality_bits: Number of address high bits for locality detection (unused)
+    
+    Returns:
+        SystemVerilog code with timing constraints
+    """
+    # Check if we have any timing constraints to generate
+    has_instr_constraints = instr_hit_latency != -1 or instr_miss_latency != -1
+    has_data_constraints = data_hit_latency != -1 or data_miss_latency != -1
+    
+    if not has_instr_constraints and not has_data_constraints:
+        return ""  # No timing constraints to generate
+    
+    code = """
+  // ========================================
+  // Cache-Aware Timing Constraints
+  // ========================================
+  // Models realistic cache hit/miss behavior for ABC optimization
+  // Injected at ibex_core level for full signal visibility
+"""
+    
+    # Generate instruction cache constraints if needed
+    if has_instr_constraints:
+        code += """
+  // Instruction cache timing tracking
+  logic [2:0] instr_stall_counter_q;
+  logic instr_likely_miss;
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+      instr_stall_counter_q <= 3'b0;
+      instr_likely_miss <= 1'b0;
+    end else begin
+      if (instr_req_o && !instr_gnt_i) begin
+        instr_stall_counter_q <= instr_stall_counter_q + 1;
+        // After 1 cycle of stalling, assume cache miss
+        instr_likely_miss <= (instr_stall_counter_q >= 1);
+      end else begin
+        instr_stall_counter_q <= 3'b0;
+        instr_likely_miss <= 1'b0;
+      end
+
+    end
+  end
+"""
+    
+    # Generate data cache constraints if needed
+    if has_data_constraints:
+        code += """
+  // Data cache timing tracking
+  logic [2:0] data_stall_counter_q;
+  logic data_likely_miss;
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+      data_stall_counter_q <= 3'b0;
+      data_likely_miss <= 1'b0;
+    end else begin
+      if (data_req_out && !data_gnt_i) begin
+        data_stall_counter_q <= data_stall_counter_q + 1;
+        data_likely_miss <= (data_stall_counter_q >= 1);
+      end else if (data_rvalid_i) begin
+        data_stall_counter_q <= 3'b0;
+        data_likely_miss <= 1'b0;
+      end
+
+    end
+  end
+"""
+    
+    # Generate timing assumptions
+    code += """
+  // Cache-aware timing assumptions
+  always_comb begin
+    if (rst_ni) begin"""
+    
+    if has_instr_constraints:
+        code += """
+      // Instruction cache: different bounds for hit vs miss"""
+        if instr_hit_latency != -1 and instr_miss_latency != -1:
+            code += f"""
+      if (!instr_likely_miss) begin
+        assume(instr_stall_counter_q <= 3'd{instr_hit_latency});  // Cache hit: {instr_hit_latency} cycle max
+      end else begin
+        assume(instr_stall_counter_q <= 3'd{instr_miss_latency});  // Cache miss: up to {instr_miss_latency} cycles
+      end"""
+        elif instr_hit_latency != -1:
+            code += f"""
+      if (!instr_likely_miss) begin
+        assume(instr_stall_counter_q <= 3'd{instr_hit_latency});  // Cache hit: {instr_hit_latency} cycle max
+      end"""
+        elif instr_miss_latency != -1:
+            code += f"""
+      if (instr_likely_miss) begin
+        assume(instr_stall_counter_q <= 3'd{instr_miss_latency});  // Cache miss: up to {instr_miss_latency} cycles
+      end"""
+        
+        if instr_miss_latency != -1:
+            code += f"""
+
+      // Force completion at maximum latency
+      if (instr_stall_counter_q == 3'd{instr_miss_latency}) begin
+        assume(instr_gnt_i);  // Must grant at max stall
+      end"""
+    
+    if has_data_constraints:
+        code += """
+      // Data cache: different bounds for hit vs miss"""
+        if data_hit_latency != -1 and data_miss_latency != -1:
+            code += f"""
+      if (!data_likely_miss) begin
+        assume(data_stall_counter_q <= 3'd{data_hit_latency});   // Cache hit: {data_hit_latency} cycle max
+      end else begin
+        assume(data_stall_counter_q <= 3'd{data_miss_latency});   // Cache miss: up to {data_miss_latency} cycles
+      end"""
+        elif data_hit_latency != -1:
+            code += f"""
+      if (!data_likely_miss) begin
+        assume(data_stall_counter_q <= 3'd{data_hit_latency});   // Cache hit: {data_hit_latency} cycle max
+      end"""
+        elif data_miss_latency != -1:
+            code += f"""
+      if (data_likely_miss) begin
+        assume(data_stall_counter_q <= 3'd{data_miss_latency});   // Cache miss: up to {data_miss_latency} cycles
+      end"""
+        
+        if data_miss_latency != -1:
+            code += f"""
+
+      // Force completion at maximum latency
+      if (data_stall_counter_q == 3'd{data_miss_latency}) begin
+        assume(data_gnt_i);  // Must grant at max stall
+      end"""
+    
+    code += """
+    end
+  end
+"""
+    
+    return code
+
+
 def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
                                register_constraint: Optional[RegisterConstraintRule] = None):
     """Generate assumptions to inject directly into ID stage (no separate module)."""
@@ -272,6 +449,13 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
     code = "\n  // ========================================\n"
     code += "  // Auto-generated instruction constraints\n"
     code += "  // ========================================\n\n"
+
+    # Add compression bit consistency check
+    code += "  // Compression bit consistency: instr_is_compressed_i must match encoding bits[1:0]\n"
+    code += "  // Compressed instructions have bits[1:0] != 11, uncompressed have bits[1:0] == 11\n"
+    code += "  always_comb begin\n"
+    code += "    assume (!rst_ni || (instr_is_compressed_i == (instr_rdata_i[1:0] != 2'b11)));\n"
+    code += "  end\n\n"
 
     # Generate register constraints
     if register_constraint:
@@ -351,7 +535,11 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
 
         # Extract outlawed instruction names from patterns for filtering
         outlawed_names = set()
-        for pattern, mask, desc in patterns:
+        for item in patterns:
+            if len(item) == 4:  # New format with is_compressed flag
+                pattern, mask, desc, is_compressed = item
+            else:  # Legacy format
+                pattern, mask, desc = item
             # Extract instruction name from description (format: "INSTR" or "INSTR { constraints }")
             instr_name = desc.split()[0].split('{')[0].strip()
             outlawed_names.add(instr_name)
@@ -396,18 +584,41 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
 
     # Only generate negative constraints if we don't have positive constraints
     # (This is for backward compatibility or when no extensions are specified)
-    # Check if we have MUL/DIV instructions
-    has_mul = any('MUL' in desc for _, _, desc in patterns)
-    has_div = any('DIV' in desc or 'REM' in desc for _, _, desc in patterns)
 
-    code += "  // Instruction encoding constraints (unconditional form for ABC)\n"
-    code += "  // When out of reset and instruction is uncompressed, these patterns don't occur\n"
-    code += "  // Written as: assume (!rst_ni || instr_is_compressed_i || pattern_mismatch)\n"
-    for pattern, mask, desc in patterns:
-        code += f"  // {desc}: Pattern=0x{pattern:08x}, Mask=0x{mask:08x}\n"
-        code += f"  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || ((instr_rdata_i & 32'h{mask:08x}) != 32'h{pattern:08x}));\n"
-        code += f"  end\n\n"
+    # Separate patterns by compression
+    patterns_32bit = []
+    patterns_16bit = []
+    for item in patterns:
+        if len(item) == 4:  # New format with is_compressed flag
+            pattern, mask, desc, is_compressed = item
+        else:  # Legacy format without is_compressed flag
+            pattern, mask, desc = item
+            is_compressed = False
+
+        if is_compressed:
+            patterns_16bit.append((pattern, mask, desc))
+        else:
+            patterns_32bit.append((pattern, mask, desc))
+
+    # Generate constraints for 32-bit instructions
+    if patterns_32bit:
+        code += "  // 32-bit instruction outlawed patterns\n"
+        code += "  // When out of reset and instruction is uncompressed, these patterns don't occur\n"
+        for pattern, mask, desc in patterns_32bit:
+            code += f"  // {desc}: Pattern=0x{pattern:08x}, Mask=0x{mask:08x}\n"
+            code += f"  always_comb begin\n"
+            code += f"    assume (!rst_ni || instr_is_compressed_i || ((instr_rdata_i[31:0] & 32'h{mask:08x}) != 32'h{pattern:08x}));\n"
+            code += f"  end\n\n"
+
+    # Generate constraints for 16-bit compressed instructions
+    if patterns_16bit:
+        code += "  // 16-bit compressed instruction outlawed patterns\n"
+        code += "  // When out of reset and instruction is compressed, these patterns don't occur\n"
+        for pattern, mask, desc in patterns_16bit:
+            code += f"  // {desc}: Pattern=0x{pattern:04x}, Mask=0x{mask:04x}\n"
+            code += f"  always_comb begin\n"
+            code += f"    assume (!rst_ni || !instr_is_compressed_i || ((instr_rdata_i[15:0] & 16'h{mask:04x}) != 16'h{pattern:04x}));\n"
+            code += f"  end\n\n"
 
     return code
 
@@ -440,9 +651,15 @@ def main():
 
     print(f"Found {len(ast.rules)} rules")
 
-    # Separate rules into required extensions, register constraints, and outlawed patterns
+    # Check if C extension is required
+    has_c_ext = has_c_extension_required(ast.rules)
+    if has_c_ext:
+        print("C extension detected - will auto-expand compressed instructions")
+
+    # Separate rules into required extensions, register constraints, timing constraints, and outlawed patterns
     required_extensions = set()
     register_constraint = None
+    timing_constraint = None
     patterns = []
     instruction_rules = []  # Keep instruction rules for dtype processing
 
@@ -453,18 +670,30 @@ def main():
             if register_constraint is not None:
                 print(f"Warning: Multiple register constraints found, using the last one (x{rule.min_reg}-x{rule.max_reg})")
             register_constraint = rule
+        elif isinstance(rule, TimingConstraintRule):
+            # Collect timing constraints - each rule sets one parameter
+            if timing_constraint is None:
+                timing_constraint = {}
+            
+            # Set the specific parameter from this rule
+            timing_constraint[rule.param_name] = rule.value
         elif isinstance(rule, InstructionRule):
             instruction_rules.append(rule)  # Save for dtype processing
-            rule_patterns = instruction_rule_to_pattern(rule)
+            rule_patterns = instruction_rule_to_pattern(rule, has_c_ext)
             patterns.extend(rule_patterns)
         elif isinstance(rule, PatternRule):
             desc = rule.description if rule.description else f"Pattern at line {rule.line}"
-            patterns.append((rule.pattern, rule.mask, desc))
+            patterns.append((rule.pattern, rule.mask, desc, False))  # PatternRules are always 32-bit
 
     if required_extensions:
         print(f"Required extensions: {', '.join(sorted(required_extensions))}")
     if register_constraint:
         print(f"Register constraint: x{register_constraint.min_reg}-x{register_constraint.max_reg} ({register_constraint.max_reg - register_constraint.min_reg + 1} registers)")
+    if timing_constraint:
+        timing_parts = []
+        for param, value in timing_constraint.items():
+            timing_parts.append(f"{param}={value}")
+        print(f"Timing constraints: {', '.join(timing_parts)}")
     print(f"Generated {len(patterns)} outlawed patterns")
 
     # Generate code
@@ -474,6 +703,27 @@ def main():
         with open(args.output_file, 'w') as f:
             f.write(code)
         print(f"Successfully wrote inline assumptions to {args.output_file}")
+        
+        # Generate separate timing constraints file if timing constraint is specified
+        if timing_constraint:
+            print(f"Generating cache-aware timing constraints...")
+            timing_code = generate_timing_constraints(
+                instr_hit_latency=timing_constraint.get('instr_hit_latency', -1),
+                instr_miss_latency=timing_constraint.get('instr_miss_latency', -1),
+                data_hit_latency=timing_constraint.get('data_hit_latency', -1),
+                data_miss_latency=timing_constraint.get('data_miss_latency', -1),
+                locality_bits=timing_constraint.get('locality_bits', -1)
+            )
+            
+            # Determine timing output file
+            if args.output_file.endswith('.sv'):
+                timing_output = args.output_file[:-3] + '_timing.sv'
+            else:
+                timing_output = args.output_file + '_timing.sv'
+            
+            with open(timing_output, 'w') as f:
+                f.write(timing_code)
+            print(f"Successfully wrote timing constraints to {timing_output}")
     else:
         # Generate full module + bind file
         # Determine bind file name
