@@ -285,10 +285,10 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
 
         # R-type (opcode[6:2] = 01100, 01110, 10100, 10110): rd, rs1, rs2
         code += "  // R-type instructions (OP, OP-32): rd, rs1, rs2\n"
-        code += "  wire is_r_type = ({instr_data}[6:2] == 5'b01100) ||  // OP (ADD, SUB, etc.)\n"
-        code += "                   ({instr_data}[6:2] == 5'b01110) ||  // OP-32 (ADDW, SUBW, etc.)\n"
-        code += "                   ({instr_data}[6:2] == 5'b10100) ||  // OP-FP\n"
-        code += "                   ({instr_data}[6:2] == 5'b10110);    // OP-V\n"
+        code += f"  wire is_r_type = ({instr_data}[6:2] == 5'b01100) ||  // OP (ADD, SUB, etc.)\n"
+        code += f"                   ({instr_data}[6:2] == 5'b01110) ||  // OP-32 (ADDW, SUBW, etc.)\n"
+        code += f"                   ({instr_data}[6:2] == 5'b10100) ||  // OP-FP\n"
+        code += f"                   ({instr_data}[6:2] == 5'b10110);    // OP-V\n"
         code += "  always_comb begin\n"
         code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_r_type ||\n"
         code += f"            (({instr_data}[11:7] <= 5'd{max_reg}) &&   // rd\n"
@@ -299,9 +299,9 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         # I-type (loads, JALR, OP-IMM): rd, rs1
         code += "  // I-type instructions (LOAD, OP-IMM, JALR): rd, rs1\n"
         code += f"  wire is_i_type = ({instr_data}[6:2] == 5'b00000) ||  // LOAD\n"
-        code += "                   ({instr_data}[6:2] == 5'b00100) ||  // OP-IMM\n"
-        code += "                   ({instr_data}[6:2] == 5'b00110) ||  // OP-IMM-32\n"
-        code += "                   ({instr_data}[6:2] == 5'b11001);    // JALR\n"
+        code += f"                   ({instr_data}[6:2] == 5'b00100) ||  // OP-IMM\n"
+        code += f"                   ({instr_data}[6:2] == 5'b00110) ||  // OP-IMM-32\n"
+        code += f"                   ({instr_data}[6:2] == 5'b11001);    // JALR\n"
         code += "  always_comb begin\n"
         code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_i_type ||\n"
         code += f"            (({instr_data}[11:7] <= 5'd{max_reg}) &&   // rd\n"
@@ -319,7 +319,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
 
         # B-type (branches): rs1, rs2 (no rd)
         code += "  // B-type instructions (BRANCH): rs1, rs2 (no rd)\n"
-        code += "  wire is_b_type = ({instr_data}[6:2] == 5'b11000);    // BRANCH\n"
+        code += f"  wire is_b_type = ({instr_data}[6:2] == 5'b11000);    // BRANCH\n"
         code += "  always_comb begin\n"
         code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_b_type ||\n"
         code += f"            (({instr_data}[19:15] <= 5'd{max_reg}) &&  // rs1\n"
@@ -328,8 +328,8 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
 
         # U-type (LUI, AUIPC): rd only
         code += "  // U-type instructions (LUI, AUIPC): rd only\n"
-        code += "  wire is_u_type = ({instr_data}[6:2] == 5'b01101) ||  // LUI\n"
-        code += "                   ({instr_data}[6:2] == 5'b00101);    // AUIPC\n"
+        code += f"  wire is_u_type = ({instr_data}[6:2] == 5'b01101) ||  // LUI\n"
+        code += f"                   ({instr_data}[6:2] == 5'b00101);    // AUIPC\n"
         code += "  always_comb begin\n"
         code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_u_type ||\n"
         code += f"            ({instr_data}[11:7] <= 5'd{max_reg}));\n"
@@ -337,7 +337,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
 
         # J-type (JAL): rd only
         code += "  // J-type instructions (JAL): rd only\n"
-        code += "  wire is_j_type = ({instr_data}[6:2] == 5'b11011);    // JAL\n"
+        code += f"  wire is_j_type = ({instr_data}[6:2] == 5'b11011);    // JAL\n"
         code += "  always_comb begin\n"
         code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_j_type ||\n"
         code += f"            ({instr_data}[11:7] <= 5'd{max_reg}));\n"
