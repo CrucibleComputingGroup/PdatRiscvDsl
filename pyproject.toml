@@ -27,7 +27,10 @@ classifiers = [
     "Topic :: System :: Hardware",
 ]
 
-dependencies = []
+dependencies = [
+    "pyyaml>=5.0",
+    "jsonschema>=3.0",
+]
 
 [project.optional-dependencies]
 dev = [

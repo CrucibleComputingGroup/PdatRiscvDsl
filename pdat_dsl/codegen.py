@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
 """
-Generate a SystemVerilog assertion module from instruction DSL.
+Generate inline SystemVerilog assumptions from instruction DSL.
 
 This script:
 1. Parses the DSL file containing instruction rules
 2. Converts high-level instruction rules to pattern/mask pairs
-3. Generates a SystemVerilog module with assertions
+3. Generates inline SystemVerilog assumptions (no separate module)
 4. Generates data type constraint assertions for operand bit patterns
+
+Output is designed to be injected directly into the target core's ID/decode stage.
 """
 
 import sys
 import argparse
 from typing import List, Tuple, Set, Optional
-from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule, DataTypeSet, TimingConstraintRule
+from pathlib import Path
+from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule, PcConstraintRule, DataTypeSet, TimingConstraintRule
 from .encodings import (
     get_instruction_encoding, parse_register, set_field, create_field_mask,
     get_extension_instructions
 )
 from .dtype_codegen import generate_dtype_check_expr, generate_dtype_set_check_expr
+from .config import CoreConfig, load_config
 
 def has_c_extension_required(rules: List) -> bool:
     """Check if RV32C or RV64C extension is required in the rules."""
@@ -206,13 +210,22 @@ bind ibex_core.id_stage_i {module_name} checker_inst (
 """
     return bind_code
 
-def generate_dtype_assertions(rules: List[InstructionRule]) -> str:
+def generate_dtype_assertions(rules: List[InstructionRule], config: Optional[CoreConfig] = None) -> str:
     """
     Generate SystemVerilog assertions for data type constraints.
 
-    Returns SystemVerilog code to be added to the checker module.
+    Args:
+        rules: List of instruction rules
+        config: Core configuration (defaults to Ibex if not provided)
+
+    Returns:
+        SystemVerilog code to be added to the checker module.
     """
+    if config is None:
+        config = CoreConfig.default_ibex()
+
     code = ""
+    data_width = config.data_width
 
     # Collect all rules with dtype constraints
     dtype_rules = []
@@ -245,18 +258,25 @@ def generate_dtype_assertions(rules: List[InstructionRule]) -> str:
 
             dtype_set = field_value
 
-            # Determine which operands to check
+            # Determine which operands to check using config
+            mul_div_instrs = {'MUL', 'MULH', 'MULHSU', 'MULHU', 'DIV', 'DIVU', 'REM', 'REMU'}
+            is_multdiv = rule.name.upper() in mul_div_instrs
+
             if field_name == 'dtype':
                 # Apply to all operands
                 operand_fields = []
                 if 'rs1' in encoding.fields:
-                    operand_fields.append(('rs1', 'multdiv_operand_a_ex_i' if rule.name.upper() in {'MUL', 'MULH', 'MULHSU', 'MULHU', 'DIV', 'DIVU', 'REM', 'REMU'} else 'alu_operand_a_ex_i'))
+                    signal = config.signals.multdiv_rs1 if is_multdiv else config.signals.alu_rs1
+                    operand_fields.append(('rs1', signal))
                 if 'rs2' in encoding.fields:
-                    operand_fields.append(('rs2', 'multdiv_operand_b_ex_i' if rule.name.upper() in {'MUL', 'MULH', 'MULHSU', 'MULHU', 'DIV', 'DIVU', 'REM', 'REMU'} else 'alu_operand_b_ex_i'))
+                    signal = config.signals.multdiv_rs2 if is_multdiv else config.signals.alu_rs2
+                    operand_fields.append(('rs2', signal))
             elif field_name == 'rs1_dtype':
-                operand_fields = [('rs1', 'multdiv_operand_a_ex_i' if rule.name.upper() in {'MUL', 'MULH', 'MULHSU', 'MULHU', 'DIV', 'DIVU', 'REM', 'REMU'} else 'alu_operand_a_ex_i')]
+                signal = config.signals.multdiv_rs1 if is_multdiv else config.signals.alu_rs1
+                operand_fields = [('rs1', signal)]
             elif field_name == 'rs2_dtype':
-                operand_fields = [('rs2', 'multdiv_operand_b_ex_i' if rule.name.upper() in {'MUL', 'MULH', 'MULHSU', 'MULHU', 'DIV', 'DIVU', 'REM', 'REMU'} else 'alu_operand_b_ex_i')]
+                signal = config.signals.multdiv_rs2 if is_multdiv else config.signals.alu_rs2
+                operand_fields = [('rs2', signal)]
             elif field_name == 'rd_dtype':
                 # Skip rd for now - would need writeback stage signals
                 continue
@@ -265,10 +285,10 @@ def generate_dtype_assertions(rules: List[InstructionRule]) -> str:
 
             # Generate check for each operand
             for operand_name, signal_name in operand_fields:
-                check_expr = generate_dtype_set_check_expr(dtype_set, signal_name)
+                check_expr = generate_dtype_set_check_expr(dtype_set, signal_name, data_width)
 
-                # Create instruction match condition
-                instr_match = f"((instr_rdata_i & 32'h{encoding.base_mask:08x}) == 32'h{encoding.base_pattern:08x})"
+                # Create instruction match condition using config signal names
+                instr_match = f"(({config.signals.instruction_data} & {data_width}'h{encoding.base_mask:08x}) == {data_width}'h{encoding.base_pattern:08x})"
 
                 # Determine assertion condition based on negation
                 if dtype_set.negated:
@@ -283,8 +303,10 @@ def generate_dtype_assertions(rules: List[InstructionRule]) -> str:
                     semantic = "forbid"
 
                 code += f"  // {rule.name} {operand_name}: {semantic} {dtype_set}\n"
+                code += f"  // Unconditional assumption (no rst_ni/instr_valid_i check)\n"
+                code += f"  // This allows ABC to use dtype constraint for optimization\n"
                 code += f"  always_comb begin\n"
-                code += f"    if (rst_ni && instr_valid_i && {instr_match}) begin\n"
+                code += f"    if ({instr_match}) begin\n"
                 code += f"      assume ({condition});\n"
                 code += f"    end\n"
                 code += f"  end\n\n"
@@ -444,19 +466,44 @@ def generate_timing_constraints(instr_hit_latency, instr_miss_latency,
 
 
 def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
-                               register_constraint: Optional[RegisterConstraintRule] = None):
-    """Generate assumptions to inject directly into ID stage (no separate module)."""
+                               register_constraint: Optional[RegisterConstraintRule] = None,
+                               pc_bits: Optional[int] = None,
+                               config: Optional[CoreConfig] = None):
+    """Generate assumptions to inject directly into ID stage (no separate module).
+
+    Args:
+        patterns: List of (pattern, mask, description, is_compressed) tuples
+        required_extensions: Set of required RISC-V extensions
+        register_constraint: Register range constraint if specified
+        pc_bits: Number of PC address bits (e.g., 16 for 64KB). If provided, constrains PC[31:pc_bits] to 0
+        config: Core configuration (defaults to Ibex if not provided)
+    """
+    if config is None:
+        config = CoreConfig.default_ibex()
+
+    data_width = config.data_width
+    instr_data = config.signals.instruction_data
 
     code = "\n  // ========================================\n"
     code += "  // Auto-generated instruction constraints\n"
+    code += f"  // Target core: {config.core_name} ({config.architecture})\n"
+    code += f"  // Inject into: {config.injection.module_path}\n"
+    code += f"  // Location: {config.injection.description}\n"
     code += "  // ========================================\n\n"
 
-    # Add compression bit consistency check
-    code += "  // Compression bit consistency: instr_is_compressed_i must match encoding bits[1:0]\n"
-    code += "  // Compressed instructions have bits[1:0] != 11, uncompressed have bits[1:0] == 11\n"
-    code += "  always_comb begin\n"
-    code += "    assume (!rst_ni || (instr_is_compressed_i == (instr_rdata_i[1:0] != 2'b11)));\n"
-    code += "  end\n\n"
+    # Add PC constraint if specified
+    if pc_bits is not None:
+        addr_space_kb = (2 ** pc_bits) // 1024
+        code += f"  // PC address space constraint: {pc_bits}-bit address space ({addr_space_kb}KB)\n"
+        code += f"  // Unconditional assumption for ABC optimization\n"
+        code += "  always_comb begin\n"
+        code += f"    assume ({config.signals.pc}[{data_width-1}:{pc_bits}] == {data_width-pc_bits}'b0);\n"
+        code += "  end\n\n"
+
+    # Note: No compression bit consistency check needed
+    # We directly check instr_rdata_i[1:0] in each assumption instead of using instr_is_compressed_i
+    # This reduces signal dependencies and gives ABC more optimization freedom
+
 
     # Generate register constraints
     if register_constraint:
@@ -470,62 +517,62 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
 
         # R-type (opcode[6:2] = 01100, 01110, 10100, 10110): rd, rs1, rs2
         code += "  // R-type instructions (OP, OP-32): rd, rs1, rs2\n"
-        code += "  wire is_r_type = (instr_rdata_i[6:2] == 5'b01100) ||  // OP (ADD, SUB, etc.)\n"
-        code += "                   (instr_rdata_i[6:2] == 5'b01110) ||  // OP-32 (ADDW, SUBW, etc.)\n"
-        code += "                   (instr_rdata_i[6:2] == 5'b10100) ||  // OP-FP\n"
-        code += "                   (instr_rdata_i[6:2] == 5'b10110);    // OP-V\n"
+        code += f"  wire is_r_type = ({instr_data}[6:2] == 5'b01100) ||  // OP (ADD, SUB, etc.)\n"
+        code += f"                   ({instr_data}[6:2] == 5'b01110) ||  // OP-32 (ADDW, SUBW, etc.)\n"
+        code += f"                   ({instr_data}[6:2] == 5'b10100) ||  // OP-FP\n"
+        code += f"                   ({instr_data}[6:2] == 5'b10110);    // OP-V\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || !is_r_type ||\n"
-        code += f"            ((instr_rdata_i[11:7] <= 5'd{max_reg}) &&   // rd\n"
-        code += f"             (instr_rdata_i[19:15] <= 5'd{max_reg}) &&  // rs1\n"
-        code += f"             (instr_rdata_i[24:20] <= 5'd{max_reg})));\n"
+        code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_r_type ||\n"
+        code += f"            (({instr_data}[11:7] <= 5'd{max_reg}) &&   // rd\n"
+        code += f"             ({instr_data}[19:15] <= 5'd{max_reg}) &&  // rs1\n"
+        code += f"             ({instr_data}[24:20] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
 
         # I-type (loads, JALR, OP-IMM): rd, rs1
         code += "  // I-type instructions (LOAD, OP-IMM, JALR): rd, rs1\n"
-        code += "  wire is_i_type = (instr_rdata_i[6:2] == 5'b00000) ||  // LOAD\n"
-        code += "                   (instr_rdata_i[6:2] == 5'b00100) ||  // OP-IMM\n"
-        code += "                   (instr_rdata_i[6:2] == 5'b00110) ||  // OP-IMM-32\n"
-        code += "                   (instr_rdata_i[6:2] == 5'b11001);    // JALR\n"
+        code += f"  wire is_i_type = ({instr_data}[6:2] == 5'b00000) ||  // LOAD\n"
+        code += f"                   ({instr_data}[6:2] == 5'b00100) ||  // OP-IMM\n"
+        code += f"                   ({instr_data}[6:2] == 5'b00110) ||  // OP-IMM-32\n"
+        code += f"                   ({instr_data}[6:2] == 5'b11001);    // JALR\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || !is_i_type ||\n"
-        code += f"            ((instr_rdata_i[11:7] <= 5'd{max_reg}) &&   // rd\n"
-        code += f"             (instr_rdata_i[19:15] <= 5'd{max_reg})));\n"
+        code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_i_type ||\n"
+        code += f"            (({instr_data}[11:7] <= 5'd{max_reg}) &&   // rd\n"
+        code += f"             ({instr_data}[19:15] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
 
         # S-type (stores): rs1, rs2 (no rd - bits [11:7] are immediate)
         code += "  // S-type instructions (STORE): rs1, rs2 (no rd)\n"
-        code += "  wire is_s_type = (instr_rdata_i[6:2] == 5'b01000);    // STORE\n"
+        code += f"  wire is_s_type = ({instr_data}[6:2] == 5'b01000);    // STORE\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || !is_s_type ||\n"
-        code += f"            ((instr_rdata_i[19:15] <= 5'd{max_reg}) &&  // rs1\n"
-        code += f"             (instr_rdata_i[24:20] <= 5'd{max_reg})));\n"
+        code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_s_type ||\n"
+        code += f"            (({instr_data}[19:15] <= 5'd{max_reg}) &&  // rs1\n"
+        code += f"             ({instr_data}[24:20] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
 
         # B-type (branches): rs1, rs2 (no rd)
         code += "  // B-type instructions (BRANCH): rs1, rs2 (no rd)\n"
-        code += "  wire is_b_type = (instr_rdata_i[6:2] == 5'b11000);    // BRANCH\n"
+        code += f"  wire is_b_type = ({instr_data}[6:2] == 5'b11000);    // BRANCH\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || !is_b_type ||\n"
-        code += f"            ((instr_rdata_i[19:15] <= 5'd{max_reg}) &&  // rs1\n"
-        code += f"             (instr_rdata_i[24:20] <= 5'd{max_reg})));\n"
+        code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_b_type ||\n"
+        code += f"            (({instr_data}[19:15] <= 5'd{max_reg}) &&  // rs1\n"
+        code += f"             ({instr_data}[24:20] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
 
         # U-type (LUI, AUIPC): rd only
         code += "  // U-type instructions (LUI, AUIPC): rd only\n"
-        code += "  wire is_u_type = (instr_rdata_i[6:2] == 5'b01101) ||  // LUI\n"
-        code += "                   (instr_rdata_i[6:2] == 5'b00101);    // AUIPC\n"
+        code += f"  wire is_u_type = ({instr_data}[6:2] == 5'b01101) ||  // LUI\n"
+        code += f"                   ({instr_data}[6:2] == 5'b00101);    // AUIPC\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || !is_u_type ||\n"
-        code += f"            (instr_rdata_i[11:7] <= 5'd{max_reg}));\n"
+        code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_u_type ||\n"
+        code += f"            ({instr_data}[11:7] <= 5'd{max_reg}));\n"
         code += "  end\n\n"
 
         # J-type (JAL): rd only
         code += "  // J-type instructions (JAL): rd only\n"
-        code += "  wire is_j_type = (instr_rdata_i[6:2] == 5'b11011);    // JAL\n"
+        code += f"  wire is_j_type = ({instr_data}[6:2] == 5'b11011);    // JAL\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || instr_is_compressed_i || !is_j_type ||\n"
-        code += f"            (instr_rdata_i[11:7] <= 5'd{max_reg}));\n"
+        code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_j_type ||\n"
+        code += f"            ({instr_data}[11:7] <= 5'd{max_reg}));\n"
         code += "  end\n\n"
 
     # Generate positive constraints from required extensions
@@ -561,13 +608,13 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         if valid_patterns:
             code += "  // Instruction must match one of these valid patterns (OR of all valid instructions)\n"
             code += "  always_comb begin\n"
-            code += "    assume (!rst_ni || instr_is_compressed_i || (\n"
+            code += f"    assume (({instr_data}[1:0] != 2'b11) || (\n"
 
             # Generate OR of all valid instruction patterns
             for i, (pattern, mask, desc) in enumerate(valid_patterns):
                 is_last = (i == len(valid_patterns) - 1)
                 connector = "" if is_last else " ||"
-                code += f"      ((instr_rdata_i & 32'h{mask:08x}) == 32'h{pattern:08x}){connector}  // {desc}\n"
+                code += f"      (({instr_data} & 32'h{mask:08x}) == 32'h{pattern:08x}){connector}  // {desc}\n"
 
             code += "    ));\n"
             code += "  end\n\n"
@@ -608,7 +655,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         for pattern, mask, desc in patterns_32bit:
             code += f"  // {desc}: Pattern=0x{pattern:08x}, Mask=0x{mask:08x}\n"
             code += f"  always_comb begin\n"
-            code += f"    assume (!rst_ni || instr_is_compressed_i || ((instr_rdata_i[31:0] & 32'h{mask:08x}) != 32'h{pattern:08x}));\n"
+            code += f"    assume (({instr_data}[1:0] != 2'b11) || (({instr_data}[{data_width-1}:0] & {data_width}'h{mask:08x}) != {data_width}'h{pattern:08x}));\n"
             code += f"  end\n\n"
 
     # Generate constraints for 16-bit compressed instructions
@@ -618,25 +665,27 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         for pattern, mask, desc in patterns_16bit:
             code += f"  // {desc}: Pattern=0x{pattern:04x}, Mask=0x{mask:04x}\n"
             code += f"  always_comb begin\n"
-            code += f"    assume (!rst_ni || !instr_is_compressed_i || ((instr_rdata_i[15:0] & 16'h{mask:04x}) != 16'h{pattern:04x}));\n"
+            code += f"    assume (({instr_data}[1:0] == 2'b11) || (({instr_data}[15:0] & 16'h{mask:04x}) != 16'h{pattern:04x}));\n"
             code += f"  end\n\n"
 
     return code
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Generate SystemVerilog assertion module from instruction DSL'
+        description='Generate inline SystemVerilog assumptions from instruction DSL'
     )
     parser.add_argument('input_file', help='DSL file containing instruction rules')
-    parser.add_argument('output_file', help='Output file')
-    parser.add_argument('--inline', action='store_true',
-                       help='Generate inline assumptions code (not a module)')
-    parser.add_argument('-m', '--module-name', default='instr_outlawed_checker',
-                       help='Name of generated module (default: instr_outlawed_checker)')
-    parser.add_argument('-b', '--bind-file',
-                       help='Output bind file (default: <output_file_base>_bind.sv)')
+    parser.add_argument('output_file', help='Output SystemVerilog file (inline assumptions)')
+    parser.add_argument('--config', type=Path,
+                       help='Core configuration YAML file (default: builtin Ibex config)')
+    parser.add_argument('--target', choices=['ibex', 'boom', 'rocket'],
+                       help='Target core shortcut (ibex, boom, rocket)')
 
     args = parser.parse_args()
+
+    # Load core configuration
+    config = load_config(args.config, args.target)
+    print(f"Target core: {config.core_name} ({config.architecture})")
 
     # Read input file
     with open(args.input_file, 'r') as f:
@@ -656,11 +705,12 @@ def main():
     has_c_ext = has_c_extension_required(ast.rules)
     if has_c_ext:
         print("C extension detected - will auto-expand compressed instructions")
-
-    # Separate rules into required extensions, register constraints, timing constraints, and outlawed patterns
+    
+    # Separate rules into required extensions, register constraints, PC constraints, and outlawed patterns, timing constraints
     required_extensions = set()
     register_constraint = None
     timing_constraint = None
+    pc_constraint = None
     patterns = []
     instruction_rules = []  # Keep instruction rules for dtype processing
 
@@ -678,6 +728,10 @@ def main():
             
             # Set the specific parameter from this rule
             timing_constraint[rule.param_name] = rule.value
+        elif isinstance(rule, PcConstraintRule):
+            if pc_constraint is not None:
+                print(f"Warning: Multiple PC constraints found, using the last one ({rule.pc_bits} bits)")
+            pc_constraint = rule
         elif isinstance(rule, InstructionRule):
             instruction_rules.append(rule)  # Save for dtype processing
             rule_patterns = instruction_rule_to_pattern(rule, has_c_ext)
@@ -690,6 +744,7 @@ def main():
         print(f"Required extensions: {', '.join(sorted(required_extensions))}")
     if register_constraint:
         print(f"Register constraint: x{register_constraint.min_reg}-x{register_constraint.max_reg} ({register_constraint.max_reg - register_constraint.min_reg + 1} registers)")
+    
     if timing_constraint:
         timing_parts = []
         for param, value in timing_constraint.items():
@@ -697,63 +752,41 @@ def main():
         print(f"Timing constraints: {', '.join(timing_parts)}")
     print(f"Generated {len(patterns)} outlawed patterns")
 
-    # Generate code
-    if args.inline:
-        # Generate inline assumptions code only
-        code = generate_inline_assumptions(patterns, required_extensions, register_constraint)
-        with open(args.output_file, 'w') as f:
-            f.write(code)
-        print(f"Successfully wrote inline assumptions to {args.output_file}")
-        
-        # Generate separate timing constraints file if timing constraint is specified
-        if timing_constraint:
-            print(f"Generating cache-aware timing constraints...")
-            timing_code = generate_timing_constraints(
-                instr_hit_latency=timing_constraint.get('instr_hit_latency', -1),
-                instr_miss_latency=timing_constraint.get('instr_miss_latency', -1),
-                data_hit_latency=timing_constraint.get('data_hit_latency', -1),
-                data_miss_latency=timing_constraint.get('data_miss_latency', -1),
-                locality_bits=timing_constraint.get('locality_bits', -1)
-            )
-            
-            # Determine timing output file
-            if args.output_file.endswith('.sv'):
-                timing_output = args.output_file[:-3] + '_timing.sv'
-            else:
-                timing_output = args.output_file + '_timing.sv'
-            
-            with open(timing_output, 'w') as f:
-                f.write(timing_code)
-            print(f"Successfully wrote timing constraints to {timing_output}")
-    else:
-        # Generate full module + bind file
-        # Determine bind file name
-        if args.bind_file:
-            bind_file = args.bind_file
+    
+    if pc_constraint:
+        addr_space_kb = (2 ** pc_constraint.pc_bits) // 1024
+        print(f"PC constraint: {pc_constraint.pc_bits} bits ({addr_space_kb}KB address space)")
+    print(f"Generated {len(patterns)} outlawed patterns")
+
+    # Generate inline assumptions code
+    pc_bits = pc_constraint.pc_bits if pc_constraint else None
+
+    print("Generating inline SystemVerilog assumptions...")
+    code = generate_inline_assumptions(patterns, required_extensions, register_constraint, pc_bits, config)
+
+    with open(args.output_file, 'w') as f:
+        f.write(code)
+    print(f"Successfully wrote inline assumptions to {args.output_file}")
+    # Generate separate timing constraints file if timing constraint is specified
+    if timing_constraint:
+        print(f"Generating cache-aware timing constraints...")
+        timing_code = generate_timing_constraints(
+            instr_hit_latency=timing_constraint.get('instr_hit_latency', -1),
+            instr_miss_latency=timing_constraint.get('instr_miss_latency', -1),
+            data_hit_latency=timing_constraint.get('data_hit_latency', -1),
+            data_miss_latency=timing_constraint.get('data_miss_latency', -1),
+            locality_bits=timing_constraint.get('locality_bits', -1)
+        )
+
+        # Determine timing output file
+        if args.output_file.endswith('.sv'):
+            timing_output = args.output_file[:-3] + '_timing.sv'
         else:
-            # Default: replace .sv with _bind.sv
-            if args.output_file.endswith('.sv'):
-                bind_file = args.output_file[:-3] + '_bind.sv'
-            else:
-                bind_file = args.output_file + '_bind.sv'
+            timing_output = args.output_file + '_timing.sv'
 
-        print(f"Generating SystemVerilog module '{args.module_name}'...")
-
-        # Generate data type assertions
-        dtype_assertions = generate_dtype_assertions(instruction_rules)
-
-        sv_code = generate_sv_module(patterns, args.module_name, dtype_assertions)
-
-        # Write checker module
-        with open(args.output_file, 'w') as f:
-            f.write(sv_code)
-        print(f"Successfully wrote {args.output_file}")
-
-        # Generate and write bind file
-        bind_code = generate_bind_file(args.module_name)
-        with open(bind_file, 'w') as f:
-            f.write(bind_code)
-        print(f"Successfully wrote {bind_file}")
-
+        with open(timing_output, 'w') as f:
+            f.write(timing_code)
+        print(f"Successfully wrote timing constraints to {timing_output}")
+        
 if __name__ == '__main__':
     main()

@@ -40,7 +40,6 @@ from .encodings import (
 
 from .codegen import (
     instruction_rule_to_pattern,
-    generate_sv_module,
     generate_inline_assumptions,
 )
 
@@ -48,8 +47,6 @@ from .codegen import (
 # These can be imported as modules since they have main() functions
 from . import vcd_to_state_json
 from . import find_signal_correspondences
-from . import smt_constraints
-from . import random_constraints
 
 __all__ = [
     # Parser
@@ -67,6 +64,5 @@ __all__ = [
     "parse_register",
     # Code generation
     "instruction_rule_to_pattern",
-    "generate_sv_module",
     "generate_inline_assumptions",
 ]

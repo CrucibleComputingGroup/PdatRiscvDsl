@@ -1,0 +1,111 @@
+# JSON Schema for PDAT Core Configuration Files
+# This file documents the expected structure of core configuration YAML files
+# and can be used by IDEs/editors for validation and autocomplete
+
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "PDAT Core Configuration"
+description: "Configuration for targeting different RISC-V cores with PDAT DSL"
+
+type: object
+required:
+  - core_name
+  - architecture
+  - signals
+
+properties:
+  core_name:
+    type: string
+    description: "Name of the RISC-V core (e.g., ibex, boom, rocket, cva6)"
+    examples:
+      - "ibex"
+      - "boom"
+      - "rocket"
+
+  architecture:
+    type: string
+    enum: ["rv32", "rv64"]
+    description: "RISC-V architecture variant"
+
+  signals:
+    type: object
+    description: "Signal name mappings for the target core"
+    required:
+      - instruction_data
+      - pc
+    properties:
+      instruction_data:
+        type: string
+        description: "Signal name for the instruction word being decoded/executed"
+        examples:
+          - "instr_rdata_i"  # Ibex
+          - "dec_uops_0_inst"  # BOOM
+          - "ibuf_io_inst_0_bits_inst_bits"  # Rocket
+
+      pc:
+        type: string
+        description: "Signal name for the program counter"
+        examples:
+          - "pc_if_o"  # Ibex
+          - "exe_pc_0"  # BOOM
+          - "ibuf_io_pc"  # Rocket
+
+      operands:
+        type: object
+        description: "Operand signal names by execution unit type"
+        properties:
+          alu:
+            type: object
+            description: "ALU (arithmetic/logic unit) operand signals"
+            required: ["rs1", "rs2"]
+            properties:
+              rs1:
+                type: string
+                description: "Source register 1 data for ALU operations"
+              rs2:
+                type: string
+                description: "Source register 2 data for ALU operations"
+
+          multdiv:
+            type: object
+            description: "Multiply/Divide unit operand signals"
+            required: ["rs1", "rs2"]
+            properties:
+              rs1:
+                type: string
+                description: "Source register 1 data for MUL/DIV operations"
+              rs2:
+                type: string
+                description: "Source register 2 data for MUL/DIV operations"
+
+  vcd:
+    type: object
+    description: "VCD waveform analysis configuration"
+    properties:
+      testbench_prefix:
+        type: string
+        description: "Signal path prefix to strip when analyzing VCD files"
+        examples:
+          - "tb_ibex_random.dut"
+          - "TestHarness.dut"
+
+additionalProperties: false
+
+# Example complete configuration:
+#
+# core_name: "ibex"
+# architecture: "rv32"
+# injection:
+#   module_path: "ibex_core.id_stage_i"
+#   description: "ID/Decode stage"
+# signals:
+#   instruction_data: "instr_rdata_i"
+#   pc: "pc_if_o"
+#   operands:
+#     alu:
+#       rs1: "alu_operand_a_ex_i"
+#       rs2: "alu_operand_b_ex_i"
+#     multdiv:
+#       rs1: "multdiv_operand_a_ex_i"
+#       rs2: "multdiv_operand_b_ex_i"
+# vcd:
+#   testbench_prefix: "tb_ibex_random.dut"

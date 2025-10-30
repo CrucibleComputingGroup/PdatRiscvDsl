@@ -29,6 +29,7 @@ class TokenType(Enum):
     # Keywords
     REQUIRE = "require"
     REQUIRE_REGISTERS = "require_registers"
+    REQUIRE_PC_BITS = "require_pc_bits"
     INSTRUCTION = "instruction"
     PATTERN = "pattern"
     MASK = "mask"
@@ -244,6 +245,12 @@ class RegisterConstraintRule:
     line: int
 
 @dataclass
+class PcConstraintRule:
+    """PC constraint like 'require_pc_bits 16' limiting PC to N address bits"""
+    pc_bits: int  # Number of PC bits (e.g., 16 for 64KB address space)
+    line: int
+
+@dataclass
 class InstructionRule:
     """High-level instruction rule like 'instruction MUL { rd = x0 }'"""
     name: str
@@ -268,7 +275,7 @@ class TimingConstraintRule:
 @dataclass
 class Program:
     """Root AST node containing all rules"""
-    rules: List[Union[RequireRule, RegisterConstraintRule, InstructionRule, PatternRule, TimingConstraintRule]]
+    rules: List[Union[RequireRule, RegisterConstraintRule, PcConstraintRule, InstructionRule, PatternRule,TimingConstraintRule]]
 
 # ============================================================================
 # Lexer
@@ -370,6 +377,8 @@ class Lexer:
             return Token(TokenType.REQUIRE, ident, start_line, start_col)
         elif ident == "require_registers":
             return Token(TokenType.REQUIRE_REGISTERS, ident, start_line, start_col)
+        elif ident == "require_pc_bits":
+            return Token(TokenType.REQUIRE_PC_BITS, ident, start_line, start_col)
         elif ident == "instruction":
             return Token(TokenType.INSTRUCTION, ident, start_line, start_col)
         elif ident == "pattern":
@@ -540,7 +549,7 @@ class Parser:
 
         return Program(rules)
 
-    def parse_rule(self) -> Optional[Union[RequireRule, RegisterConstraintRule, InstructionRule, PatternRule, TimingConstraintRule]]:
+    def parse_rule(self) -> Optional[Union[RequireRule, RegisterConstraintRule, PcConstraintRule, InstructionRule, PatternRule,TimingConstraintRule]]:
         """Parse a single rule"""
         tok = self.peek()
 
@@ -551,6 +560,8 @@ class Parser:
             return self.parse_require_rule()
         elif tok.type == TokenType.REQUIRE_REGISTERS:
             return self.parse_register_constraint_rule()
+        elif tok.type == TokenType.REQUIRE_PC_BITS:
+            return self.parse_pc_constraint_rule()
         elif tok.type == TokenType.INSTRUCTION:
             return self.parse_instruction_rule()
         elif tok.type == TokenType.PATTERN:
@@ -560,7 +571,7 @@ class Parser:
                          TokenType.LOCALITY_BITS):
             return self.parse_timing_parameter_rule()
         else:
-            self.error(f"Expected 'require', 'require_registers', 'instruction', 'pattern', or timing parameter, got {tok.type}")
+            self.error(f"Expected 'require', 'require_registers', 'require_pc_bits', 'instruction' , 'timing parameter' or 'pattern', got {tok.type}")
 
     def parse_require_rule(self) -> RequireRule:
         """Parse: require IDENTIFIER"""
@@ -622,6 +633,19 @@ class Parser:
             self.error(f"Invalid register range: {min_reg}-{max_reg} (min > max)")
 
         return RegisterConstraintRule(min_reg, max_reg, require_reg_tok.line)
+
+    def parse_pc_constraint_rule(self) -> PcConstraintRule:
+        """Parse: require_pc_bits NUMBER"""
+        require_pc_tok = self.expect(TokenType.REQUIRE_PC_BITS)
+        pc_bits_tok = self.expect(TokenType.NUMBER)
+
+        pc_bits = pc_bits_tok.value
+
+        # Validate pc_bits is reasonable (1-32 for RV32)
+        if pc_bits < 1 or pc_bits > 32:
+            self.error(f"PC bits {pc_bits} out of range (1-32)")
+
+        return PcConstraintRule(pc_bits, require_pc_tok.line)
 
     def parse_instruction_rule(self) -> InstructionRule:
         """Parse: instruction IDENTIFIER [ field_constraints ]"""
@@ -904,6 +928,8 @@ DSL Syntax:
                     print(f"   Extension: {rule.extension}")
                 elif isinstance(rule, RegisterConstraintRule):
                     print(f"   Register range: x{rule.min_reg}-x{rule.max_reg} ({rule.max_reg - rule.min_reg + 1} registers)")
+                elif isinstance(rule, PcConstraintRule):
+                    print(f"   PC bits: {rule.pc_bits} ({2**rule.pc_bits} bytes = {2**rule.pc_bits // 1024}KB address space)")
                 elif isinstance(rule, InstructionRule):
                     print(f"   Name: {rule.name}")
                     if rule.constraints:
@@ -922,6 +948,7 @@ DSL Syntax:
             # Summary
             require_count = sum(1 for r in ast.rules if isinstance(r, RequireRule))
             reg_constraint_count = sum(1 for r in ast.rules if isinstance(r, RegisterConstraintRule))
+            pc_constraint_count = sum(1 for r in ast.rules if isinstance(r, PcConstraintRule))
             instr_count = sum(1 for r in ast.rules if isinstance(r, InstructionRule))
             pattern_count = sum(1 for r in ast.rules if isinstance(r, PatternRule))
             timing_count = sum(1 for r in ast.rules if isinstance(r, TimingConstraintRule))
@@ -929,6 +956,8 @@ DSL Syntax:
                 print(f"  - {require_count} require rules")
             if reg_constraint_count > 0:
                 print(f"  - {reg_constraint_count} register constraint rules")
+            if pc_constraint_count > 0:
+                print(f"  - {pc_constraint_count} PC constraint rules")
             print(f"  - {instr_count} instruction rules")
             print(f"  - {pattern_count} pattern rules")
             if timing_count > 0:
