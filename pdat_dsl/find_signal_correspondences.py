@@ -21,10 +21,11 @@ from collections import defaultdict
 
 class VCDSignal:
     """Represents a signal from VCD file."""
-    def __init__(self, identifier: str, name: str, width: int):
+    def __init__(self, identifier: str, name: str, width: int, low_bit: int = 0):
         self.identifier = identifier  # VCD short identifier (e.g., "!")
         self.name = name              # Full hierarchical name
         self.width = width            # Bit width
+        self.low_bit = low_bit        # Lowest bit index (e.g., 8 for [31:8])
         self.values = []              # List of (time, value) tuples
 
     def add_value(self, time: int, value: str):
@@ -52,6 +53,44 @@ class VCDSignal:
         if self.is_constant() and len(self.values) > 0:
             return self.values[0][1]
         return None
+
+    def get_constant_bits(self, low_bit: int = 0) -> Dict[int, str]:
+        """
+        Find which individual bits are constant (for multi-bit signals).
+
+        Args:
+            low_bit: The lowest bit index of the signal (e.g., 8 for [31:8], 0 for [7:0])
+
+        Returns: Dict[actual_bit_index, constant_value]
+        Example: {4: '0', 7: '1'} means hardware bit 4 is always 0, bit 7 is always 1
+        """
+        if self.width == 1:
+            # For 1-bit signals, use is_constant()
+            return {}
+
+        if len(self.values) == 0:
+            return {}
+
+        constant_bits = {}
+
+        # Check each bit position in the value string
+        for value_idx in range(self.width):
+            bit_values = []
+
+            for time, value in self.values:
+                # Extract bit at position value_idx in the string
+                # LSB is rightmost, so value_idx 0 is value[-1], value_idx 1 is value[-2], etc.
+                if len(value) > value_idx:
+                    bit_val = value[-(value_idx + 1)]
+                    bit_values.append(bit_val)
+
+            # Check if this bit is constant
+            if bit_values and all(b == bit_values[0] for b in bit_values):
+                # Map value_idx to actual hardware bit index
+                actual_bit_idx = low_bit + value_idx
+                constant_bits[actual_bit_idx] = bit_values[0]
+
+        return constant_bits
 
 def parse_vcd_header(lines: List[str]) -> Tuple[Dict[str, VCDSignal], int]:
     """
@@ -105,11 +144,19 @@ def parse_vcd_header(lines: List[str]) -> Tuple[Dict[str, VCDSignal], int]:
                 else:
                     full_name = signal_name
 
-                # Handle array indices like [31:0]
+                # Parse bit range to get low_bit (e.g., [31:8] -> low_bit=8)
+                low_bit = 0
                 if len(parts) > 5 and parts[5].startswith('['):
                     full_name += " " + parts[5]
+                    # Extract bit range
+                    import re
+                    bit_range_match = re.search(r'\[(\d+):(\d+)\]', parts[5])
+                    if bit_range_match:
+                        high = int(bit_range_match.group(1))
+                        low = int(bit_range_match.group(2))
+                        low_bit = low
 
-                signals[identifier] = VCDSignal(identifier, full_name, width)
+                signals[identifier] = VCDSignal(identifier, full_name, width, low_bit)
 
         i += 1
 
@@ -188,7 +235,7 @@ def group_signals_by_width(signals: Dict[str, VCDSignal]) -> Dict[int, List[VCDS
 
 def find_arbitrary_constants(signals: List[VCDSignal]) -> List[Tuple[str, str, int]]:
     """
-    Find signals that are constant but not all-0s or all-1s.
+    Find all constant signals (including all-0s and all-1s).
 
     Returns: List of (signal_name, constant_value, width)
     """
@@ -200,33 +247,63 @@ def find_arbitrary_constants(signals: List[VCDSignal]) -> List[Tuple[str, str, i
             if const_val is None:
                 continue
 
-            # Check if it's all 0s
-            is_zero = all(c == '0' for c in const_val if c in '01')
-            # Check if it's all 1s
-            is_ones = all(c == '1' for c in const_val if c in '01')
-
-            # If neither all-0 nor all-1, it's an arbitrary constant
-            if not is_zero and not is_ones:
-                arbitrary_constants.append((sig.name, const_val, sig.width))
+            # Include ALL constant signals, not just arbitrary ones
+            # This is important for 1-bit signals which can only be 0 or 1
+            arbitrary_constants.append((sig.name, const_val, sig.width))
 
     return arbitrary_constants
 
-def find_correspondences(signals_by_width: Dict[int, List[VCDSignal]]) -> Tuple[Dict[int, Dict[str, List[str]]], Dict[int, List[Tuple[str, str]]]]:
+
+def find_per_bit_constants(signals: List[VCDSignal]) -> List[Tuple[str, int, str]]:
+    """
+    Find individual constant bits within multi-bit signals.
+
+    For signals where the full signal is NOT constant, but individual bits are.
+    Example: rf_raddr[4:0] might vary, but rf_raddr[4] is always 0.
+
+    Returns: List of (signal_name, bit_index, bit_value)
+    """
+    per_bit_constants = []
+
+    for sig in signals:
+        # Skip signals that are fully constant (already handled)
+        if sig.is_constant():
+            continue
+
+        # Skip 1-bit signals (no individual bits to check)
+        if sig.width <= 1:
+            continue
+
+        # Check each bit (pass low_bit to get actual hardware bit indices)
+        constant_bits = sig.get_constant_bits(sig.low_bit)
+
+        for bit_idx, bit_value in constant_bits.items():
+            per_bit_constants.append((sig.name, bit_idx, bit_value))
+
+    return per_bit_constants
+
+def find_correspondences(signals_by_width: Dict[int, List[VCDSignal]]) -> Tuple[Dict[int, Dict[str, List[str]]], Dict[int, List[Tuple[str, str]]], List[Tuple[str, int, str]]]:
     """
     Find signal correspondences by hash collision.
 
-    Returns: (correspondences, arbitrary_constants)
+    Returns: (correspondences, arbitrary_constants, per_bit_constants)
         correspondences: {width: {hash: [signal_names]}}
         arbitrary_constants: {width: [(signal_name, constant_value)]}
+        per_bit_constants: [(signal_name, bit_index, bit_value)]
     """
     correspondences = {}
     all_arbitrary_constants = {}
+    all_per_bit_constants = []
 
     for width, signals in signals_by_width.items():
         # Find arbitrary constants for this width
         arb_consts = find_arbitrary_constants(signals)
         if arb_consts:
             all_arbitrary_constants[width] = [(name, val) for name, val, w in arb_consts]
+
+        # Find per-bit constants
+        per_bit_consts = find_per_bit_constants(signals)
+        all_per_bit_constants.extend(per_bit_consts)
 
         # Add constant signals
         const_zero = create_constant_signal(width, 0, "ZERO")
@@ -246,7 +323,7 @@ def find_correspondences(signals_by_width: Dict[int, List[VCDSignal]]) -> Tuple[
         if collisions:
             correspondences[width] = collisions
 
-    return correspondences, all_arbitrary_constants
+    return correspondences, all_arbitrary_constants, all_per_bit_constants
 
 def format_correspondences_report(correspondences: Dict[int, Dict[str, List[str]]],
                                    arbitrary_constants: Dict[int, List[Tuple[str, str]]],
@@ -304,6 +381,7 @@ def format_correspondences_report(correspondences: Dict[int, Dict[str, List[str]
 
 def export_json(correspondences: Dict[int, Dict[str, List[str]]],
                 arbitrary_constants: Dict[int, List[Tuple[str, str]]],
+                per_bit_constants: List[Tuple[str, int, str]],
                 output_file: str,
                 constants_only: bool = False):
     """Export correspondences to JSON format."""
@@ -311,7 +389,8 @@ def export_json(correspondences: Dict[int, Dict[str, List[str]]],
     # Convert to more readable JSON structure
     output = {
         "equivalence_classes": [],
-        "arbitrary_constants": []
+        "arbitrary_constants": [],
+        "per_bit_constants": []
     }
 
     class_id = 0
@@ -348,10 +427,19 @@ def export_json(correspondences: Dict[int, Dict[str, List[str]]],
                 "value": const_value
             })
 
+    # Add per-bit constants
+    for signal_name, bit_index, bit_value in per_bit_constants:
+        output["per_bit_constants"].append({
+            "signal": signal_name,
+            "bit_index": bit_index,
+            "bit_value": bit_value
+        })
+
     output["summary"] = {
         "total_equivalence_classes": len(output["equivalence_classes"]),
         "total_signals_in_classes": sum(len(ec["signals"]) for ec in output["equivalence_classes"]),
         "total_arbitrary_constants": len(output["arbitrary_constants"]),
+        "total_per_bit_constants": len(output["per_bit_constants"]),
         "constants_only_filter": constants_only
     }
 
@@ -420,18 +508,19 @@ def main():
     print("[4/5] Grouping signals by width and computing hashes...")
     signals_by_width = group_signals_by_width(signals)
 
-    # Find correspondences and arbitrary constants
-    correspondences, arbitrary_constants = find_correspondences(signals_by_width)
+    # Find correspondences, arbitrary constants, and per-bit constants
+    correspondences, arbitrary_constants, per_bit_constants = find_correspondences(signals_by_width)
 
     num_groups = sum(len(colls) for colls in correspondences.values())
     num_arb_consts = sum(len(consts) for consts in arbitrary_constants.values())
     print(f"  Found {num_groups} equivalence groups")
     print(f"  Found {num_arb_consts} arbitrary constant signals")
+    print(f"  Found {len(per_bit_constants)} per-bit constants")
     print("")
 
     # Export results
     print("[5/5] Exporting results...")
-    export_json(correspondences, arbitrary_constants, args.output_json, args.constants_only)
+    export_json(correspondences, arbitrary_constants, per_bit_constants, args.output_json, args.constants_only)
     print(f"  JSON: {args.output_json}")
     if args.constants_only:
         print(f"  (constants-only mode: filtered for CONSTANT_ZERO/ONES equivalences)")
