@@ -33,6 +33,13 @@ class TokenType(Enum):
     INSTRUCTION = "instruction"
     PATTERN = "pattern"
     MASK = "mask"
+    
+    # Timing parameters
+    INSTR_HIT_LATENCY = "instr_hit_latency"
+    INSTR_MISS_LATENCY = "instr_miss_latency"
+    DATA_HIT_LATENCY = "data_hit_latency"
+    DATA_MISS_LATENCY = "data_miss_latency"
+    LOCALITY_BITS = "locality_bits"
 
     # Literals
     IDENTIFIER = "identifier"
@@ -259,9 +266,16 @@ class PatternRule:
     line: int
 
 @dataclass
+class TimingConstraintRule:
+    """Timing constraint rule like 'instr_hit_latency 1'"""
+    param_name: str
+    value: int
+    line: int = 0
+
+@dataclass
 class Program:
     """Root AST node containing all rules"""
-    rules: List[Union[RequireRule, RegisterConstraintRule, PcConstraintRule, InstructionRule, PatternRule]]
+    rules: List[Union[RequireRule, RegisterConstraintRule, PcConstraintRule, InstructionRule, PatternRule,TimingConstraintRule]]
 
 # ============================================================================
 # Lexer
@@ -371,6 +385,16 @@ class Lexer:
             return Token(TokenType.PATTERN, ident, start_line, start_col)
         elif ident == "mask":
             return Token(TokenType.MASK, ident, start_line, start_col)
+        elif ident == "instr_hit_latency":
+            return Token(TokenType.INSTR_HIT_LATENCY, ident, start_line, start_col)
+        elif ident == "instr_miss_latency":
+            return Token(TokenType.INSTR_MISS_LATENCY, ident, start_line, start_col)
+        elif ident == "data_hit_latency":
+            return Token(TokenType.DATA_HIT_LATENCY, ident, start_line, start_col)
+        elif ident == "data_miss_latency":
+            return Token(TokenType.DATA_MISS_LATENCY, ident, start_line, start_col)
+        elif ident == "locality_bits":
+            return Token(TokenType.LOCALITY_BITS, ident, start_line, start_col)
         # Check if it's a data type (i8, u16, i32, u64, etc.)
         elif self._is_data_type(ident):
             return Token(TokenType.DTYPE, ident, start_line, start_col)
@@ -525,7 +549,7 @@ class Parser:
 
         return Program(rules)
 
-    def parse_rule(self) -> Optional[Union[RequireRule, RegisterConstraintRule, PcConstraintRule, InstructionRule, PatternRule]]:
+    def parse_rule(self) -> Optional[Union[RequireRule, RegisterConstraintRule, PcConstraintRule, InstructionRule, PatternRule,TimingConstraintRule]]:
         """Parse a single rule"""
         tok = self.peek()
 
@@ -542,8 +566,12 @@ class Parser:
             return self.parse_instruction_rule()
         elif tok.type == TokenType.PATTERN:
             return self.parse_pattern_rule()
+        elif tok.type in (TokenType.INSTR_HIT_LATENCY, TokenType.INSTR_MISS_LATENCY, 
+                         TokenType.DATA_HIT_LATENCY, TokenType.DATA_MISS_LATENCY, 
+                         TokenType.LOCALITY_BITS):
+            return self.parse_timing_parameter_rule()
         else:
-            self.error(f"Expected 'require', 'require_registers', 'require_pc_bits', 'instruction' or 'pattern', got {tok.type}")
+            self.error(f"Expected 'require', 'require_registers', 'require_pc_bits', 'instruction' , 'timing parameter' or 'pattern', got {tok.type}")
 
     def parse_require_rule(self) -> RequireRule:
         """Parse: require IDENTIFIER"""
@@ -641,6 +669,17 @@ class Parser:
         # We can't easily get it here, so leave as None for now
 
         return PatternRule(pattern_num.value, mask_num.value, None, pattern_tok.line)
+
+    def parse_timing_parameter_rule(self) -> TimingConstraintRule:
+        """Parse: instr_hit_latency 1"""
+        param_tok = self.advance()
+        value_tok = self.expect(TokenType.NUMBER)
+        
+        return TimingConstraintRule(
+            param_name=param_tok.value,
+            value=value_tok.value,
+            line=param_tok.line
+        )
 
     def parse_field_constraints(self) -> List[FieldConstraint]:
         """Parse: { field_constraint , field_constraint , ... }"""
@@ -902,6 +941,9 @@ DSL Syntax:
                     print(f"   Mask:    0x{rule.mask:08x}")
                     if rule.description:
                         print(f"   Description: {rule.description}")
+                elif isinstance(rule, TimingConstraintRule):
+                    # Show the specific parameter that was set
+                    print(f"   {rule.param_name}: {rule.value}")
         else:
             # Summary
             require_count = sum(1 for r in ast.rules if isinstance(r, RequireRule))
@@ -909,6 +951,7 @@ DSL Syntax:
             pc_constraint_count = sum(1 for r in ast.rules if isinstance(r, PcConstraintRule))
             instr_count = sum(1 for r in ast.rules if isinstance(r, InstructionRule))
             pattern_count = sum(1 for r in ast.rules if isinstance(r, PatternRule))
+            timing_count = sum(1 for r in ast.rules if isinstance(r, TimingConstraintRule))
             if require_count > 0:
                 print(f"  - {require_count} require rules")
             if reg_constraint_count > 0:
@@ -917,6 +960,8 @@ DSL Syntax:
                 print(f"  - {pc_constraint_count} PC constraint rules")
             print(f"  - {instr_count} instruction rules")
             print(f"  - {pattern_count} pattern rules")
+            if timing_count > 0:
+                print(f"  - {timing_count} timing constraint rules")
             print("\nUse -v for detailed output")
 
     except SyntaxError as e:
