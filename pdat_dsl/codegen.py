@@ -162,13 +162,11 @@ module {module_name} (
     patterns_32 = []
     for item in patterns:
         if len(item) == 4:
-            p, m, d, is_compressed = item
-            if m <= 0xFFFFFFFF:
-                patterns_32.append((p, m, d))
+            p, m, d, _ = item
         else:
             p, m, d = item
-            if m <= 0xFFFFFFFF:
-                patterns_32.append((p, m, d))
+        if m <= 0xFFFFFFFF:
+            patterns_32.append((p, m, d))
 
     if patterns_32:
         sv_code += "  // 32-bit outlawed instruction patterns\n"
