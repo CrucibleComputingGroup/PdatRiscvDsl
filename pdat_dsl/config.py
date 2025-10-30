@@ -60,6 +60,11 @@ CORE_CONFIG_SCHEMA = {
                     "type": "string",
                     "description": "Signal name for program counter"
                 },
+                "has_compressed_check": {
+                    "type": "boolean",
+                    "description": "Whether instruction signal has bits [1:0] for compressed check (default: true)",
+                    "default": True
+                },
                 "operands": {
                     "type": "object",
                     "description": "Operand signal names by execution unit",
@@ -127,6 +132,9 @@ class SignalConfig:
     instruction_data: str = "instr_rdata_i"
     pc: str = "pc_if_o"
 
+    # Instruction signal properties
+    has_compressed_check: bool = True  # Whether bits [1:0] exist for compressed check
+
     # Operand signals by execution unit
     alu_rs1: str = "alu_operand_a_ex_i"
     alu_rs2: str = "alu_operand_b_ex_i"
@@ -142,6 +150,8 @@ class SignalConfig:
             signals.instruction_data = d['instruction_data']
         if 'pc' in d:
             signals.pc = d['pc']
+        if 'has_compressed_check' in d:
+            signals.has_compressed_check = d['has_compressed_check']
 
         # Handle operand signals (can be flat or nested)
         if 'operands' in d:
