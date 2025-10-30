@@ -495,7 +495,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += f"  // PC address space constraint: {pc_bits}-bit address space ({addr_space_kb}KB)\n"
         code += f"  // Unconditional assumption for ABC optimization\n"
         code += "  always_comb begin\n"
-        code += f"    assume ({config.signals.pc}[{data_width-1}:{pc_bits}] == {data_width-pc_bits}'b0);\n"
+        code += f"    assume (!rst_ni || {config.signals.pc}[{data_width-1}:{pc_bits}] == {data_width-pc_bits}'b0);\n"
         code += "  end\n\n"
 
     # Note: No compression bit consistency check needed
@@ -520,7 +520,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += f"                   ({instr_data}[6:2] == 5'b10100) ||  // OP-FP\n"
         code += f"                   ({instr_data}[6:2] == 5'b10110);    // OP-V\n"
         code += "  always_comb begin\n"
-        code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_r_type ||\n"
+        code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || !is_r_type ||\n"
         code += f"            (({instr_data}[11:7] <= 5'd{max_reg}) &&   // rd\n"
         code += f"             ({instr_data}[19:15] <= 5'd{max_reg}) &&  // rs1\n"
         code += f"             ({instr_data}[24:20] <= 5'd{max_reg})));\n"
@@ -533,7 +533,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += f"                   ({instr_data}[6:2] == 5'b00110) ||  // OP-IMM-32\n"
         code += f"                   ({instr_data}[6:2] == 5'b11001);    // JALR\n"
         code += "  always_comb begin\n"
-        code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_i_type ||\n"
+        code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || !is_i_type ||\n"
         code += f"            (({instr_data}[11:7] <= 5'd{max_reg}) &&   // rd\n"
         code += f"             ({instr_data}[19:15] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
@@ -542,7 +542,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += "  // S-type instructions (STORE): rs1, rs2 (no rd)\n"
         code += f"  wire is_s_type = ({instr_data}[6:2] == 5'b01000);    // STORE\n"
         code += "  always_comb begin\n"
-        code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_s_type ||\n"
+        code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || !is_s_type ||\n"
         code += f"            (({instr_data}[19:15] <= 5'd{max_reg}) &&  // rs1\n"
         code += f"             ({instr_data}[24:20] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
@@ -551,7 +551,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += "  // B-type instructions (BRANCH): rs1, rs2 (no rd)\n"
         code += f"  wire is_b_type = ({instr_data}[6:2] == 5'b11000);    // BRANCH\n"
         code += "  always_comb begin\n"
-        code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_b_type ||\n"
+        code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || !is_b_type ||\n"
         code += f"            (({instr_data}[19:15] <= 5'd{max_reg}) &&  // rs1\n"
         code += f"             ({instr_data}[24:20] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
@@ -561,7 +561,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += f"  wire is_u_type = ({instr_data}[6:2] == 5'b01101) ||  // LUI\n"
         code += f"                   ({instr_data}[6:2] == 5'b00101);    // AUIPC\n"
         code += "  always_comb begin\n"
-        code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_u_type ||\n"
+        code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || !is_u_type ||\n"
         code += f"            ({instr_data}[11:7] <= 5'd{max_reg}));\n"
         code += "  end\n\n"
 
@@ -569,7 +569,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += "  // J-type instructions (JAL): rd only\n"
         code += f"  wire is_j_type = ({instr_data}[6:2] == 5'b11011);    // JAL\n"
         code += "  always_comb begin\n"
-        code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_j_type ||\n"
+        code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || !is_j_type ||\n"
         code += f"            ({instr_data}[11:7] <= 5'd{max_reg}));\n"
         code += "  end\n\n"
 
@@ -606,7 +606,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         if valid_patterns:
             code += "  // Instruction must match one of these valid patterns (OR of all valid instructions)\n"
             code += "  always_comb begin\n"
-            code += f"    assume (({instr_data}[1:0] != 2'b11) || (\n"
+            code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || (\n"
 
             # Generate OR of all valid instruction patterns
             for i, (pattern, mask, desc) in enumerate(valid_patterns):
@@ -653,7 +653,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         for pattern, mask, desc in patterns_32bit:
             code += f"  // {desc}: Pattern=0x{pattern:08x}, Mask=0x{mask:08x}\n"
             code += f"  always_comb begin\n"
-            code += f"    assume (({instr_data}[1:0] != 2'b11) || (({instr_data}[{data_width-1}:0] & {data_width}'h{mask:08x}) != {data_width}'h{pattern:08x}));\n"
+            code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || (({instr_data}[{data_width-1}:0] & {data_width}'h{mask:08x}) != {data_width}'h{pattern:08x}));\n"
             code += f"  end\n\n"
 
     # Generate constraints for 16-bit compressed instructions
@@ -663,7 +663,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         for pattern, mask, desc in patterns_16bit:
             code += f"  // {desc}: Pattern=0x{pattern:04x}, Mask=0x{mask:04x}\n"
             code += f"  always_comb begin\n"
-            code += f"    assume (({instr_data}[1:0] == 2'b11) || (({instr_data}[15:0] & 16'h{mask:04x}) != 16'h{pattern:04x}));\n"
+            code += f"    assume (!rst_ni || ({instr_data}[1:0] == 2'b11) || (({instr_data}[15:0] & 16'h{mask:04x}) != 16'h{pattern:04x}));\n"
             code += f"  end\n\n"
 
     return code
