@@ -28,6 +28,7 @@ from .parser import (
     RequireRule,
     RegisterConstraintRule,
     FieldConstraint,
+    TimingConstraintRule,
 )
 
 from .encodings import (
