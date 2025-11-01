@@ -21,7 +21,7 @@ from .encodings import (
     get_extension_instructions
 )
 from .dtype_codegen import generate_dtype_check_expr, generate_dtype_set_check_expr
-from .config import CoreConfig, load_config
+from .config import CoreConfig, ModuleConfig, SignalConfig, load_config
 
 
 def has_c_extension_required(rules: List) -> bool:
@@ -45,8 +45,7 @@ def instruction_rule_to_pattern(rule: InstructionRule, has_c_ext: bool = False) 
     # Get the base encoding for this instruction
     encoding = get_instruction_encoding(rule.name)
     if not encoding:
-        print(f"Warning: Unknown instruction '{
-              rule.name}' at line {rule.line}, skipping")
+        print(f"Warning: Unknown instruction '{rule.name}' at line {rule.line}, skipping")
         return []
 
     # Start with the base pattern and mask
@@ -237,9 +236,11 @@ def generate_dtype_assertions(rules: List[InstructionRule], config: Optional[Cor
     code = ""
     data_width = config.data_width
 
-    # Collect all rules with dtype constraints
+    # Collect all InstructionRules with dtype constraints
     dtype_rules = []
     for rule in rules:
+        if not isinstance(rule, InstructionRule):
+            continue
         has_dtype = any(c.field_name == 'dtype' or c.field_name.endswith('_dtype')
                         for c in rule.constraints)
         if has_dtype:
@@ -316,11 +317,126 @@ def generate_dtype_assertions(rules: List[InstructionRule], config: Optional[Cor
                     semantic = "forbid"
 
                 code += f"  // {rule.name} {operand_name}: {semantic} {dtype_set}\n"
-                code += f"  // Unconditional assumption (no rst_ni/instr_valid_i check)\n"
-                code += f"  // This allows ABC to use dtype constraint for optimization\n"
+                code += f"  // Gated by reset to allow ABC scorr (init state must satisfy constraints)\n"
                 code += f"  always_comb begin\n"
                 code += f"    if ({instr_match}) begin\n"
-                code += f"      assume ({condition});\n"
+                code += f"      assume (!rst_ni || ({condition}));\n"
+                code += f"    end\n"
+                code += f"  end\n\n"
+
+    return code
+
+
+def generate_module_dtype_assertions(rules: List[InstructionRule],
+                                      module_config: ModuleConfig,
+                                      data_width: int = 32) -> str:
+    """
+    Generate SystemVerilog data type assertions for a specific module.
+
+    This is used for hierarchical synthesis where a module (like ibex_ex_block)
+    is synthesized separately. The operand signals are PRIMARY INPUTS to the
+    module, so ABC can optimize with these constraints.
+
+    Args:
+        rules: List of instruction rules with dtype constraints
+        module_config: Module configuration with signal names
+        data_width: Data width (32 for RV32, 64 for RV64)
+
+    Returns:
+        SystemVerilog assumption code for the module
+    """
+    if not module_config.signals:
+        raise ValueError(f"Module '{module_config.name}' has no signal configuration")
+
+    signals = module_config.signals
+    code = ""
+
+    # Collect all InstructionRules with dtype constraints
+    dtype_rules = []
+    for rule in rules:
+        if not isinstance(rule, InstructionRule):
+            continue
+        has_dtype = any(c.field_name == 'dtype' or c.field_name.endswith('_dtype')
+                        for c in rule.constraints)
+        if has_dtype:
+            dtype_rules.append(rule)
+
+    if not dtype_rules:
+        return ""
+
+    code += "  // ========================================\n"
+    code += f"  // Data type constraints for {module_config.name}\n"
+    code += "  // Operands are PRIMARY INPUTS - satisfiable at init state\n"
+    code += "  // ========================================\n\n"
+
+    # For each rule with dtype constraints
+    for rule in dtype_rules:
+        encoding = get_instruction_encoding(rule.name)
+        if not encoding:
+            continue
+
+        # Extract dtype constraints
+        for constraint in rule.constraints:
+            field_name = constraint.field_name
+            field_value = constraint.field_value
+
+            if not isinstance(field_value, DataTypeSet):
+                continue
+
+            dtype_set = field_value
+
+            # Determine which operands to check using module config
+            mul_div_instrs = {'MUL', 'MULH', 'MULHSU',
+                              'MULHU', 'DIV', 'DIVU', 'REM', 'REMU'}
+            is_multdiv = rule.name.upper() in mul_div_instrs
+
+            if field_name == 'dtype':
+                # Apply to all operands
+                operand_fields = []
+                if 'rs1' in encoding.fields:
+                    signal = signals.multdiv_rs1 if is_multdiv else signals.alu_rs1
+                    operand_fields.append(('rs1', signal))
+                if 'rs2' in encoding.fields:
+                    signal = signals.multdiv_rs2 if is_multdiv else signals.alu_rs2
+                    operand_fields.append(('rs2', signal))
+            elif field_name == 'rs1_dtype':
+                signal = signals.multdiv_rs1 if is_multdiv else signals.alu_rs1
+                operand_fields = [('rs1', signal)]
+            elif field_name == 'rs2_dtype':
+                signal = signals.multdiv_rs2 if is_multdiv else signals.alu_rs2
+                operand_fields = [('rs2', signal)]
+            elif field_name == 'rd_dtype':
+                # Skip rd for now - would need writeback stage signals
+                continue
+            else:
+                continue
+
+            # Generate check for each operand
+            for operand_name, signal_name in operand_fields:
+                check_expr = generate_dtype_set_check_expr(
+                    dtype_set, signal_name, data_width)
+
+                # Create instruction match condition using module signal names
+                instr_match = f"(({signals.instruction_data} & {data_width}'h{
+                    encoding.base_mask:08x}) == {data_width}'h{encoding.base_pattern:08x})"
+
+                # Determine assertion condition based on negation
+                if dtype_set.negated:
+                    # Negated: ALLOW only these types (forbid all others)
+                    # Assert that operand MUST match one of the types
+                    condition = check_expr
+                    semantic = "allow only"
+                else:
+                    # Not negated: FORBID these types
+                    # Assert that operand must NOT match any of the types
+                    condition = f"!{check_expr}"
+                    semantic = "forbid"
+
+                code += f"  // {rule.name} {operand_name}: {semantic} {dtype_set}\n"
+                code += f"  // Gated by reset - operands are PRIMARY INPUTS (no init state issue)\n"
+                code += f"  always_comb begin\n"
+                code += f"    if ({instr_match}) begin\n"
+                code += f"      assume (!rst_ni || ({condition}));\n"
                 code += f"    end\n"
                 code += f"  end\n\n"
 
@@ -482,7 +598,8 @@ def generate_timing_constraints(instr_hit_latency, instr_miss_latency,
 def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
                                 register_constraint: Optional[RegisterConstraintRule] = None,
                                 pc_bits: Optional[int] = None,
-                                config: Optional[CoreConfig] = None):
+                                config: Optional[CoreConfig] = None,
+                                instruction_rules: Optional[List[InstructionRule]] = None):
     """Generate assumptions to inject directly into ID stage (no separate module).
 
     Args:
@@ -491,6 +608,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         register_constraint: Register range constraint if specified
         pc_bits: Number of PC address bits (e.g., 16 for 64KB). If provided, constrains PC[31:pc_bits] to 0
         config: Core configuration (defaults to Ibex if not provided)
+        instruction_rules: List of instruction rules (for data type constraint generation)
     """
     if config is None:
         config = CoreConfig.default_ibex()
@@ -584,6 +702,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         if has_compressed_check:
             code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_s_type ||\n"
         else:
+            code += f"    assume (!is_s_type ||\n"
         code += f"            (({instr_data}[19:15] <= 5'd{
             max_reg}) &&  // rs1\n"
         code += f"             ({instr_data}[24:20] <= 5'd{max_reg})));\n"
@@ -630,6 +749,12 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
             code += f"    assume (!is_j_type ||\n"
         code += f"            ({instr_data}[11:7] <= 5'd{max_reg}));\n"
         code += "  end\n\n"
+
+    # Generate data type constraints
+    if instruction_rules:
+        dtype_code = generate_dtype_assertions(instruction_rules, config)
+        if dtype_code:
+            code += dtype_code
 
     # Generate positive constraints from required extensions
     valid_patterns = []  # Define at this scope so it's accessible later
@@ -838,7 +963,7 @@ def main():
 
     print("Generating inline SystemVerilog assumptions...")
     code = generate_inline_assumptions(
-        patterns, required_extensions, register_constraint, pc_bits, config)
+        patterns, required_extensions, register_constraint, pc_bits, config, instruction_rules)
 
     with open(args.output_file, 'w') as f:
         f.write(code)
