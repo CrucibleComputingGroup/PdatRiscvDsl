@@ -6,8 +6,7 @@ This module generates assertions that check operand bit patterns match
 the specified data type constraints (width and signedness).
 """
 
-from typing import List, Tuple, Set, Optional
-from .parser import InstructionRule, DataType, DataTypeSet
+from .parser import DataType, DataTypeSet
 
 def generate_dtype_check_expr(dtype: DataType, operand_signal: str, width: int = 32) -> str:
     """
@@ -82,136 +81,8 @@ def generate_dtype_set_check_expr(dtype_set: DataTypeSet, operand_signal: str, w
     return combined
 
 
-def generate_instruction_dtype_assertions(rule: InstructionRule,
-                                          instr_valid_signal: str = "instr_valid_i",
-                                          instr_data_signal: str = "instr_rdata_i") -> List[str]:
-    """
-    Generate SystemVerilog assertions for data type constraints on an instruction.
-
-    Args:
-        rule: The instruction rule with dtype constraints
-        instr_valid_signal: Signal indicating instruction is valid
-        instr_data_signal: The instruction bits signal
-
-    Returns:
-        List of SystemVerilog assertion strings
-
-    The generated assertions check:
-    1. The instruction matches the opcode
-    2. The operands satisfy the data type constraints
-    """
-    from .encodings import get_instruction_encoding
-
-    assertions = []
-
-    # Get instruction encoding
-    encoding = get_instruction_encoding(rule.name)
-    if not encoding:
-        return []  # Unknown instruction, skip
-
-    # Check if rule has any dtype constraints
-    dtype_constraints = {}
-    for constraint in rule.constraints:
-        field_name = constraint.field_name
-        if field_name == 'dtype' or field_name.endswith('_dtype'):
-            dtype_constraints[field_name] = constraint.field_value
-
-    if not dtype_constraints:
-        return []  # No dtype constraints
-
-    # For each dtype constraint, generate assertions
-    for field_name, dtype_set in dtype_constraints.items():
-        if not isinstance(dtype_set, DataTypeSet):
-            continue  # Not a dtype constraint
-
-        # Determine which operand(s) this constraint applies to
-        if field_name == 'dtype':
-            # Applies to all operands
-            operand_fields = []
-            if 'rd' in encoding.fields:
-                operand_fields.append('rd')
-            if 'rs1' in encoding.fields:
-                operand_fields.append('rs1')
-            if 'rs2' in encoding.fields:
-                operand_fields.append('rs2')
-        elif field_name == 'rd_dtype':
-            operand_fields = ['rd']
-        elif field_name == 'rs1_dtype':
-            operand_fields = ['rs1']
-        elif field_name == 'rs2_dtype':
-            operand_fields = ['rs2']
-        else:
-            continue  # Unknown dtype field
-
-        # Map operand fields to actual signals
-        # This depends on the microarchitecture
-        for operand_field in operand_fields:
-            signal_name = get_operand_signal_name(rule.name, operand_field)
-            if not signal_name:
-                continue
-
-            # Generate the check expression
-            check_expr = generate_dtype_set_check_expr(dtype_set, signal_name)
-
-            # Apply negation if needed
-            if dtype_set.negated:
-                # Negated: we want to ALLOW only these types
-                # So we assert that the operand MUST match one of these types
-                assertion_condition = check_expr
-                semantic = "allow only"
-            else:
-                # Not negated: we want to FORBID these types
-                # So we assert that the operand does NOT match any of these types
-                assertion_condition = f"!{check_expr}"
-                semantic = "forbid"
-
-            # Create the assertion
-            assertion = f"  // {rule.name} {operand_field}: {semantic} {dtype_set}\n"
-            assertion += f"  assert property (@(posedge clk_i) disable iff (!rst_ni)\n"
-            assertion += f"    ({instr_valid_signal} && is_{rule.name.lower()}_{operand_field}) |-> {assertion_condition}\n"
-            assertion += f"  ) else $error(\"{rule.name} {operand_field} violates dtype constraint: {dtype_set}\");\n"
-
-            assertions.append(assertion)
-
-    return assertions
-
-
-def get_operand_signal_name(instr_name: str, operand_field: str) -> Optional[str]:
-    """
-    Map instruction name and operand field to the actual signal name in Ibex.
-
-    For Ibex microarchitecture:
-    - ALU instructions: alu_operand_a_ex, alu_operand_b_ex
-    - MUL/DIV instructions: multdiv_operand_a_ex, multdiv_operand_b_ex
-    - LSU stores: lsu_wdata (from rs2)
-    - rd (destination): checked at writeback via rf_wdata
-    """
-    # Classify instruction type
-    mul_div_instrs = {'MUL', 'MULH', 'MULHSU', 'MULHU', 'DIV', 'DIVU', 'REM', 'REMU'}
-    store_instrs = {'SB', 'SH', 'SW', 'SD'}
-
-    if instr_name.upper() in mul_div_instrs:
-        # Multiply/Divide unit
-        if operand_field == 'rs1':
-            return 'multdiv_operand_a_ex'
-        elif operand_field == 'rs2':
-            return 'multdiv_operand_b_ex'
-        elif operand_field == 'rd':
-            # Result written back - check at writeback stage
-            return 'rf_wdata_wb'  # May need to gate with mult_en
-    elif instr_name.upper() in store_instrs:
-        # Store instruction
-        if operand_field == 'rs2':
-            return 'lsu_wdata'
-        elif operand_field == 'rs1':
-            return 'alu_operand_a_ex'  # Address calculation
-    else:
-        # Regular ALU instruction
-        if operand_field == 'rs1':
-            return 'alu_operand_a_ex'
-        elif operand_field == 'rs2':
-            return 'alu_operand_b_ex'
-        elif operand_field == 'rd':
-            return 'rf_wdata_wb'
-
-    return None
+# Note: Data type constraint code generation for full instruction assertions
+# has been removed. The actual implementation is in codegen.py which properly
+# uses CoreConfig to get signal names. The functions below (generate_dtype_check_expr
+# and generate_dtype_set_check_expr) are still used by codegen.py to generate
+# the boolean expressions for data type checking.

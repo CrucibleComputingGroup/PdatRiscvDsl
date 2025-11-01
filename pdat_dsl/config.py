@@ -11,7 +11,7 @@ Rocket, CVA6, etc.) without code changes.
 import yaml
 import jsonschema
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 
 
@@ -102,6 +102,105 @@ CORE_CONFIG_SCHEMA = {
                 }
             },
             "additionalProperties": False
+        },
+        "rtl": {
+            "type": "object",
+            "description": "RTL file organization for synthesis",
+            "properties": {
+                "root_dir": {
+                    "type": "string",
+                    "description": "Root directory for core RTL (relative or absolute)"
+                },
+                "include_dirs": {
+                    "type": "array",
+                    "description": "Include directories for SystemVerilog (relative to root_dir)",
+                    "items": {"type": "string"}
+                },
+                "support_files": {
+                    "type": "array",
+                    "description": "Support files to include (packages, primitives, macros)",
+                    "items": {"type": "string"}
+                },
+                "core_files": {
+                    "type": "array",
+                    "description": "Core RTL files (modules)",
+                    "items": {"type": "string"}
+                }
+            },
+            "additionalProperties": False
+        },
+        "modules": {
+            "type": "array",
+            "description": "Submodules for hierarchical synthesis",
+            "items": {
+                "type": "object",
+                "required": ["name", "module_path"],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Module name (e.g., ex_block)"
+                    },
+                    "module_path": {
+                        "type": "string",
+                        "description": "Hierarchical path to module instance"
+                    },
+                    "rtl_path": {
+                        "type": "string",
+                        "description": "Path to module RTL file (relative or absolute)"
+                    },
+                    "synthesize_separately": {
+                        "type": "boolean",
+                        "description": "Whether to synthesize this module separately",
+                        "default": True
+                    },
+                    "added_ports": {
+                        "type": "object",
+                        "description": "Ports to add during RTL patching",
+                        "properties": {
+                            "instruction_data": {"type": "string"},
+                            "instruction_compressed": {"type": "string"},
+                            "pc": {"type": "string"}
+                        },
+                        "additionalProperties": False
+                    },
+                    "injection": {
+                        "type": "object",
+                        "description": "Injection point for this module",
+                        "properties": {
+                            "description": {"type": "string"}
+                        },
+                        "additionalProperties": False
+                    },
+                    "signals": {
+                        "type": "object",
+                        "description": "Module-specific signal names",
+                        "properties": {
+                            "instruction_data": {"type": "string"},
+                            "pc": {"type": "string"},
+                            "has_compressed_check": {"type": "boolean"},
+                            "operands": {
+                                "type": "object",
+                                "properties": {
+                                    "alu": {
+                                        "type": "object",
+                                        "properties": {
+                                            "rs1": {"type": "string"},
+                                            "rs2": {"type": "string"}
+                                        }
+                                    },
+                                    "multdiv": {
+                                        "type": "object",
+                                        "properties": {
+                                            "rs1": {"type": "string"},
+                                            "rs2": {"type": "string"}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "additionalProperties": True  # Allow extensions like 'synthesis' for PdatScorr
@@ -171,6 +270,29 @@ class SignalConfig:
 
 
 @dataclass
+class RtlConfig:
+    """RTL file organization configuration."""
+    root_dir: str = "../PdatCoreSim/cores/ibex"
+    include_dirs: List[str] = field(default_factory=lambda: ["rtl", "shared/rtl", "vendor/lowrisc_ip/ip/prim/rtl", "vendor/lowrisc_ip/dv/sv/dv_utils"])
+    support_files: List[str] = field(default_factory=lambda: ["vendor/lowrisc_ip/ip/prim/rtl/prim_assert.sv", "rtl/ibex_pkg.sv"])
+    core_files: List[str] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> 'RtlConfig':
+        """Create RtlConfig from dictionary."""
+        rtl = cls()
+        if 'root_dir' in d:
+            rtl.root_dir = d['root_dir']
+        if 'include_dirs' in d:
+            rtl.include_dirs = d['include_dirs']
+        if 'support_files' in d:
+            rtl.support_files = d['support_files']
+        if 'core_files' in d:
+            rtl.core_files = d['core_files']
+        return rtl
+
+
+@dataclass
 class VcdConfig:
     """VCD analysis configuration."""
     testbench_prefix: str = "tb_ibex_random.dut"
@@ -185,13 +307,48 @@ class VcdConfig:
 
 
 @dataclass
+class ModuleConfig:
+    """Configuration for a submodule in hierarchical synthesis."""
+    name: str
+    module_path: str
+    rtl_path: Optional[str] = None
+    synthesize_separately: bool = True
+    added_ports: Dict[str, str] = field(default_factory=dict)
+    injection: Optional[InjectionPoint] = None
+    signals: Optional[SignalConfig] = None
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> 'ModuleConfig':
+        """Create ModuleConfig from dictionary."""
+        module = cls(
+            name=d['name'],
+            module_path=d['module_path']
+        )
+
+        if 'rtl_path' in d:
+            module.rtl_path = d['rtl_path']
+        if 'synthesize_separately' in d:
+            module.synthesize_separately = d['synthesize_separately']
+        if 'added_ports' in d:
+            module.added_ports = d['added_ports']
+        if 'injection' in d:
+            module.injection = InjectionPoint.from_dict(d['injection'])
+        if 'signals' in d:
+            module.signals = SignalConfig.from_dict(d['signals'])
+
+        return module
+
+
+@dataclass
 class CoreConfig:
     """Complete configuration for a RISC-V core target."""
     core_name: str = "ibex"
     architecture: str = "rv32"  # rv32 or rv64
     injection: InjectionPoint = field(default_factory=InjectionPoint)
     signals: SignalConfig = field(default_factory=SignalConfig)
+    rtl: RtlConfig = field(default_factory=RtlConfig)
     vcd: VcdConfig = field(default_factory=VcdConfig)
+    modules: List[ModuleConfig] = field(default_factory=list)
 
     @classmethod
     def from_yaml(cls, yaml_path: Path) -> 'CoreConfig':
@@ -222,8 +379,12 @@ class CoreConfig:
             config.injection = InjectionPoint.from_dict(data['injection'])
         if 'signals' in data:
             config.signals = SignalConfig.from_dict(data['signals'])
+        if 'rtl' in data:
+            config.rtl = RtlConfig.from_dict(data['rtl'])
         if 'vcd' in data:
             config.vcd = VcdConfig.from_dict(data['vcd'])
+        if 'modules' in data:
+            config.modules = [ModuleConfig.from_dict(m) for m in data['modules']]
 
         return config
 

@@ -789,9 +789,9 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
             code += "  // Instruction must match one of these valid patterns (OR of all valid instructions)\n"
             code += "  always_comb begin\n"
             if has_compressed_check:
-                code += f"    assume (({instr_data}[1:0] != 2'b11) || (\n"
+                code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || (\n"
             else:
-                code += f"    assume (\n"
+                code += f"    assume (!rst_ni || (\n"
 
             # Generate OR of all valid instruction patterns
             for i, (pattern, mask, desc) in enumerate(valid_patterns):

@@ -66,6 +66,30 @@ For more information, visit: https://github.com/yourusername/PdatDsl
         help="Target core shortcut (ibex, boom, rocket)"
     )
 
+    # Hierarchical synthesis command
+    hier_synth_parser = subparsers.add_parser(
+        "hierarchical-synth",
+        help="Hierarchical synthesis with data type constraints"
+    )
+    hier_synth_parser.add_argument("dsl_file", type=Path, help="DSL file with constraints")
+    hier_synth_parser.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Core configuration YAML with modules section"
+    )
+    hier_synth_parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("output/hierarchical"),
+        help="Output directory (default: output/hierarchical)"
+    )
+    hier_synth_parser.add_argument(
+        "--rtl-dir",
+        type=Path,
+        help="Core RTL directory (auto-detected if not specified)"
+    )
+
     # Test command
     test_parser = subparsers.add_parser(
         "test",
@@ -124,6 +148,16 @@ For more information, visit: https://github.com/yourusername/PdatDsl
         if hasattr(args, 'target') and args.target:
             sys.argv.extend(["--target", args.target])
         return codegen_main()
+
+    elif args.command == "hierarchical-synth":
+        from .hierarchical_synth import hierarchical_synthesis
+        success = hierarchical_synthesis(
+            args.dsl_file,
+            args.config,
+            args.output,
+            args.rtl_dir if hasattr(args, 'rtl_dir') else None
+        )
+        return 0 if success else 1
 
     elif args.command == "test":
         from .parser import parse_dsl
