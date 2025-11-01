@@ -66,8 +66,7 @@ def instruction_rule_to_pattern(rule: InstructionRule, has_c_ext: bool = False) 
 
         # Check if this field exists in the instruction format
         if field_name not in encoding.fields:
-            print(f"Warning: Field '{field_name}' not valid for {
-                  rule.name} at line {rule.line}")
+            print(f"Warning: Field '{field_name}' not valid for {rule.name} at line {rule.line}")
             continue
 
         field_pos, field_width = encoding.fields[field_name]
