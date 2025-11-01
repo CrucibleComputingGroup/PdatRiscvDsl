@@ -112,8 +112,7 @@ def instruction_rule_to_pattern(rule: InstructionRule, has_c_ext: bool = False) 
     # Create description
     desc = f"{rule.name}"
     if rule.constraints:
-        constraint_strs = [f"{c.field_name}={
-            c.field_value}" for c in rule.constraints]
+        constraint_strs = [f"{c.field_name}={c.field_value}" for c in rule.constraints]
         desc += " { " + ", ".join(constraint_strs) + " }"
 
     # Add the base instruction pattern
