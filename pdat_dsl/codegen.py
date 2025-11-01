@@ -87,8 +87,7 @@ def instruction_rule_to_pattern(rule: InstructionRule, has_c_ext: bool = False) 
                 if isinstance(field_value, int):
                     reg_num = field_value
                 else:
-                    print(f"Warning: Invalid register '{
-                          field_value}' at line {rule.line}")
+                    print(f"Warning: Invalid register '{field_value}' at line {rule.line}")
                     continue
             field_value = reg_num
 
@@ -103,8 +102,7 @@ def instruction_rule_to_pattern(rule: InstructionRule, has_c_ext: bool = False) 
                 else:
                     field_value = int(field_value)
             except ValueError:
-                print(f"Warning: Cannot parse field value '{
-                      field_value}' at line {rule.line}")
+                print(f"Warning: Cannot parse field value '{field_value}' at line {rule.line}")
                 continue
 
         # Set the field in the pattern and add to mask
@@ -913,8 +911,7 @@ def main():
             required_extensions.add(rule.extension)
         elif isinstance(rule, RegisterConstraintRule):
             if register_constraint is not None:
-                print(f"Warning: Multiple register constraints found, using the last one (x{
-                      rule.min_reg}-x{rule.max_reg})")
+                print(f"Warning: Multiple register constraints found, using the last one (x{rule.min_reg}-x{rule.max_reg})")
             register_constraint = rule
         elif isinstance(rule, TimingConstraintRule):
             # Collect timing constraints - each rule sets one parameter
@@ -925,8 +922,7 @@ def main():
             timing_constraint[rule.param_name] = rule.value
         elif isinstance(rule, PcConstraintRule):
             if pc_constraint is not None:
-                print(f"Warning: Multiple PC constraints found, using the last one ({
-                      rule.pc_bits} bits)")
+                print(f"Warning: Multiple PC constraints found, using the last one ({rule.pc_bits} bits)")
             pc_constraint = rule
         elif isinstance(rule, InstructionRule):
             instruction_rules.append(rule)  # Save for dtype processing
@@ -941,8 +937,7 @@ def main():
     if required_extensions:
         print(f"Required extensions: {', '.join(sorted(required_extensions))}")
     if register_constraint:
-        print(f"Register constraint: x{register_constraint.min_reg}-x{register_constraint.max_reg} ({
-              register_constraint.max_reg - register_constraint.min_reg + 1} registers)")
+        print(f"Register constraint: x{register_constraint.min_reg}-x{register_constraint.max_reg} ({register_constraint.max_reg - register_constraint.min_reg + 1} registers)")
 
     if timing_constraint:
         timing_parts = []
@@ -953,8 +948,7 @@ def main():
 
     if pc_constraint:
         addr_space_kb = (2 ** pc_constraint.pc_bits) // 1024
-        print(f"PC constraint: {pc_constraint.pc_bits} bits ({
-              addr_space_kb}KB address space)")
+        print(f"PC constraint: {pc_constraint.pc_bits} bits ({addr_space_kb}KB address space)")
     print(f"Generated {len(patterns)} outlawed patterns")
 
     # Generate inline assumptions code
