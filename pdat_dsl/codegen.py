@@ -126,8 +126,7 @@ def instruction_rule_to_pattern(rule: InstructionRule, has_c_ext: bool = False) 
         if compressed_encoding:
             # For compressed version, we don't apply field constraints since they're different formats
             # Just outlaw the compressed version entirely
-            compressed_desc = f"{
-                compressed_name} (auto-expanded from {rule.name})"
+            compressed_desc = f"{compressed_name} (auto-expanded from {rule.name})"
             results.append((compressed_encoding.base_pattern, compressed_encoding.base_mask,
                             compressed_desc, True))
 
@@ -182,8 +181,7 @@ module {module_name} (
             sv_code += f"  // Combinational assumption: when valid, this pattern doesn't occur\n"
             sv_code += f"  always_comb begin\n"
             sv_code += f"    if (rst_ni && instr_valid_i && !instr_is_compressed_i) begin\n"
-            sv_code += f"      assume ((instr_rdata_i & 32'h{mask:08x}) != 32'h{
-                pattern:08x});\n"
+            sv_code += f"      assume ((instr_rdata_i & 32'h{mask:08x}) != 32'h{pattern:08x});\n"
             sv_code += f"    end\n"
             sv_code += f"  end\n\n"
 
@@ -297,8 +295,7 @@ def generate_dtype_assertions(rules: List[InstructionRule], config: Optional[Cor
                     dtype_set, signal_name, data_width)
 
                 # Create instruction match condition using config signal names
-                instr_match = f"(({config.signals.instruction_data} & {data_width}'h{
-                    encoding.base_mask:08x}) == {data_width}'h{encoding.base_pattern:08x})"
+                instr_match = f"(({config.signals.instruction_data} & {data_width}'h{encoding.base_mask:08x}) == {data_width}'h{encoding.base_pattern:08x})"
 
                 # Determine assertion condition based on negation
                 if dtype_set.negated:
@@ -413,8 +410,7 @@ def generate_module_dtype_assertions(rules: List[InstructionRule],
                     dtype_set, signal_name, data_width)
 
                 # Create instruction match condition using module signal names
-                instr_match = f"(({signals.instruction_data} & {data_width}'h{
-                    encoding.base_mask:08x}) == {data_width}'h{encoding.base_pattern:08x})"
+                instr_match = f"(({signals.instruction_data} & {data_width}'h{encoding.base_mask:08x}) == {data_width}'h{encoding.base_pattern:08x})"
 
                 # Determine assertion condition based on negation
                 if dtype_set.negated:
@@ -623,12 +619,10 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
     # Add PC constraint if specified
     if pc_bits is not None:
         addr_space_kb = (2 ** pc_bits) // 1024
-        code += f"  // PC address space constraint: {
-            pc_bits}-bit address space ({addr_space_kb}KB)\n"
+        code += f"  // PC address space constraint: {pc_bits}-bit address space ({addr_space_kb}KB)\n"
         code += f"  // Unconditional assumption for ABC optimization\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || {config.signals.pc}[{data_width-1}:{
-            pc_bits}] == {data_width-pc_bits}'b0);\n"
+        code += f"    assume (!rst_ni || {config.signals.pc}[{data_width-1}:{pc_bits}] == {data_width-pc_bits}'b0);\n"
         code += "  end\n\n"
 
     # Note: No compression bit consistency check needed
@@ -639,8 +633,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
     if register_constraint:
         min_reg = register_constraint.min_reg
         max_reg = register_constraint.max_reg
-        code += f"  // Register constraint: only x{min_reg}-x{
-            max_reg} allowed ({max_reg - min_reg + 1} registers)\n"
+        code += f"  // Register constraint: only x{min_reg}-x{max_reg} allowed ({max_reg - min_reg + 1} registers)\n"
         code += "  // Constraints applied based on instruction format (not all instructions use all fields)\n\n"
 
         # RISC-V instruction formats and which register fields they use:
@@ -648,82 +641,65 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
 
         # R-type (opcode[6:2] = 01100, 01110, 10100, 10110): rd, rs1, rs2
         code += "  // R-type instructions (OP, OP-32): rd, rs1, rs2\n"
-        code += f"  wire is_r_type = ({
-            instr_data}[6:2] == 5'b01100) ||  // OP (ADD, SUB, etc.)\n"
-        code += f"                   ({
-            instr_data}[6:2] == 5'b01110) ||  // OP-32 (ADDW, SUBW, etc.)\n"
-        code += f"                   ({
-            instr_data}[6:2] == 5'b10100) ||  // OP-FP\n"
-        code += f"                   ({
-            instr_data}[6:2] == 5'b10110);    // OP-V\n"
+        code += f"  wire is_r_type = ({instr_data}[6:2] == 5'b01100) ||  // OP (ADD, SUB, etc.)\n"
+        code += f"                   ({instr_data}[6:2] == 5'b01110) ||  // OP-32 (ADDW, SUBW, etc.)\n"
+        code += f"                   ({instr_data}[6:2] == 5'b10100) ||  // OP-FP\n"
+        code += f"                   ({instr_data}[6:2] == 5'b10110);    // OP-V\n"
         code += "  always_comb begin\n"
         if has_compressed_check:
             code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_r_type ||\n"
         else:
             code += f"    assume (!is_r_type ||\n"
-        code += f"            (({instr_data}[11:7] <= 5'd{
-            max_reg}) &&   // rd\n"
-        code += f"             ({instr_data}[19:15] <= 5'd{
-            max_reg}) &&  // rs1\n"
+        code += f"            (({instr_data}[11:7] <= 5'd{max_reg}) &&   // rd\n"
+        code += f"             ({instr_data}[19:15] <= 5'd{max_reg}) &&  // rs1\n"
         code += f"             ({instr_data}[24:20] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
 
         # I-type (loads, JALR, OP-IMM): rd, rs1
         code += "  // I-type instructions (LOAD, OP-IMM, JALR): rd, rs1\n"
-        code += f"  wire is_i_type = ({
-            instr_data}[6:2] == 5'b00000) ||  // LOAD\n"
-        code += f"                   ({
-            instr_data}[6:2] == 5'b00100) ||  // OP-IMM\n"
-        code += f"                   ({
-            instr_data}[6:2] == 5'b00110) ||  // OP-IMM-32\n"
-        code += f"                   ({
-            instr_data}[6:2] == 5'b11001);    // JALR\n"
+        code += f"  wire is_i_type = ({instr_data}[6:2] == 5'b00000) ||  // LOAD\n"
+        code += f"                   ({instr_data}[6:2] == 5'b00100) ||  // OP-IMM\n"
+        code += f"                   ({instr_data}[6:2] == 5'b00110) ||  // OP-IMM-32\n"
+        code += f"                   ({instr_data}[6:2] == 5'b11001);    // JALR\n"
         code += "  always_comb begin\n"
 
         if has_compressed_check:
             code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_i_type ||\n"
         else:
             code += f"    assume (!is_i_type ||\n"
-        code += f"            (({instr_data}[11:7] <= 5'd{
-            max_reg}) &&   // rd\n"
+        code += f"            (({instr_data}[11:7] <= 5'd{max_reg}) &&   // rd\n"
         code += f"             ({instr_data}[19:15] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
 
         # S-type (stores): rs1, rs2 (no rd - bits [11:7] are immediate)
         code += "  // S-type instructions (STORE): rs1, rs2 (no rd)\n"
-        code += f"  wire is_s_type = ({
-            instr_data}[6:2] == 5'b01000);    // STORE\n"
+        code += f"  wire is_s_type = ({instr_data}[6:2] == 5'b01000);    // STORE\n"
         code += "  always_comb begin\n"
 
         if has_compressed_check:
             code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_s_type ||\n"
         else:
             code += f"    assume (!is_s_type ||\n"
-        code += f"            (({instr_data}[19:15] <= 5'd{
-            max_reg}) &&  // rs1\n"
+        code += f"            (({instr_data}[19:15] <= 5'd{max_reg}) &&  // rs1\n"
         code += f"             ({instr_data}[24:20] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
 
         # B-type (branches): rs1, rs2 (no rd)
         code += "  // B-type instructions (BRANCH): rs1, rs2 (no rd)\n"
-        code += f"  wire is_b_type = ({
-            instr_data}[6:2] == 5'b11000);    // BRANCH\n"
+        code += f"  wire is_b_type = ({instr_data}[6:2] == 5'b11000);    // BRANCH\n"
         code += "  always_comb begin\n"
         if has_compressed_check:
             code += f"    assume (({instr_data}[1:0] != 2'b11) || !is_b_type ||\n"
         else:
             code += f"    assume (!is_b_type ||\n"
-        code += f"            (({instr_data}[19:15] <= 5'd{
-            max_reg}) &&  // rs1\n"
+        code += f"            (({instr_data}[19:15] <= 5'd{max_reg}) &&  // rs1\n"
         code += f"             ({instr_data}[24:20] <= 5'd{max_reg})));\n"
         code += "  end\n\n"
 
         # U-type (LUI, AUIPC): rd only
         code += "  // U-type instructions (LUI, AUIPC): rd only\n"
-        code += f"  wire is_u_type = ({
-            instr_data}[6:2] == 5'b01101) ||  // LUI\n"
-        code += f"                   ({
-            instr_data}[6:2] == 5'b00101);    // AUIPC\n"
+        code += f"  wire is_u_type = ({instr_data}[6:2] == 5'b01101) ||  // LUI\n"
+        code += f"                   ({instr_data}[6:2] == 5'b00101);    // AUIPC\n"
         code += "  always_comb begin\n"
 
         if has_compressed_check:
@@ -735,8 +711,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
 
         # J-type (JAL): rd only
         code += "  // J-type instructions (JAL): rd only\n"
-        code += f"  wire is_j_type = ({
-            instr_data}[6:2] == 5'b11011);    // JAL\n"
+        code += f"  wire is_j_type = ({instr_data}[6:2] == 5'b11011);    // JAL\n"
         code += "  always_comb begin\n"
 
         if has_compressed_check:
@@ -770,8 +745,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
             outlawed_names.add(instr_name)
 
         if outlawed_names:
-            code += f"  // Excluding outlawed: {
-                ', '.join(sorted(outlawed_names))}\n"
+            code += f"  // Excluding outlawed: {', '.join(sorted(outlawed_names))}\n"
 
         # Collect all valid instruction patterns from required extensions
         # BUT exclude those that are outlawed
@@ -796,8 +770,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
             for i, (pattern, mask, desc) in enumerate(valid_patterns):
                 is_last = (i == len(valid_patterns) - 1)
                 connector = "" if is_last else " ||"
-                code += f"      (({instr_data} & 32'h{mask:08x}) == 32'h{
-                    pattern:08x}){connector}  // {desc}\n"
+                code += f"      (({instr_data} & 32'h{mask:08x}) == 32'h{pattern:08x}){connector}  // {desc}\n"
 
             if has_compressed_check:
                 code += "    ));\n"
@@ -841,8 +814,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         for pattern, mask, desc in patterns_32bit:
             code += f"  // {desc}: Pattern=0x{pattern:08x}, Mask=0x{mask:08x}\n"
             code += f"  always_comb begin\n"
-            code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || (({instr_data}[{
-                data_width-1}:0] & {data_width}'h{mask:08x}) != {data_width}'h{pattern:08x}));\n"
+            code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || (({instr_data}[{data_width-1}:0] & {data_width}'h{mask:08x}) != {data_width}'h{pattern:08x}));\n"
             code += f"  end\n\n"
 
     # Generate constraints for 16-bit compressed instructions
@@ -852,8 +824,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         for pattern, mask, desc in patterns_16bit:
             code += f"  // {desc}: Pattern=0x{pattern:04x}, Mask=0x{mask:04x}\n"
             code += f"  always_comb begin\n"
-            code += f"    assume (!rst_ni || ({instr_data}[1:0] == 2'b11) || (({
-                instr_data}[15:0] & 16'h{mask:04x}) != 16'h{pattern:04x}));\n"
+            code += f"    assume (!rst_ni || ({instr_data}[1:0] == 2'b11) || (({instr_data}[15:0] & 16'h{mask:04x}) != 16'h{pattern:04x}));\n"
             code += f"  end\n\n"
 
     return code
@@ -928,8 +899,7 @@ def main():
             rule_patterns = instruction_rule_to_pattern(rule, has_c_ext)
             patterns.extend(rule_patterns)
         elif isinstance(rule, PatternRule):
-            desc = rule.description if rule.description else f"Pattern at line {
-                rule.line}"
+            desc = rule.description if rule.description else f"Pattern at line {rule.line}"
             # PatternRules are always 32-bit
             patterns.append((rule.pattern, rule.mask, desc, False))
 
