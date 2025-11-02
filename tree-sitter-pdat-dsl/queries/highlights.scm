@@ -1,8 +1,12 @@
 ; Keywords
 [
+  "version"
   "require"
   "require_registers"
+  "require_pc_bits"
   "instruction"
+  "include"
+  "forbid"
   "pattern"
   "mask"
 ] @keyword
@@ -18,6 +22,12 @@
 (instruction_rule
   name: (identifier) @function)
 
+(include_rule
+  name: (identifier) @function)
+
+(forbid_rule
+  name: (identifier) @function)
+
 ; Register names
 (register_name) @variable.parameter
 
@@ -27,6 +37,9 @@
 
 ; Numbers
 (number) @number
+
+; Bit patterns
+(bit_pattern) @string.special
 
 ; Wildcards
 (wildcard) @constant.builtin

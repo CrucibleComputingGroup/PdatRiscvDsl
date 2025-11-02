@@ -21,10 +21,20 @@ module.exports = grammar({
     source_file: $ => repeat($._statement),
 
     _statement: $ => choice(
+      $.version_directive,
       $.require_rule,
       $.require_registers_rule,
+      $.require_pc_bits_rule,
       $.instruction_rule,
+      $.include_rule,
+      $.forbid_rule,
       $.pattern_rule,
+    ),
+
+    // version 2
+    version_directive: $ => seq(
+      'version',
+      field('version', $.number)
     ),
 
     // require RV32I
@@ -37,6 +47,36 @@ module.exports = grammar({
     require_registers_rule: $ => seq(
       'require_registers',
       field('range', $.register_range)
+    ),
+
+    // require_pc_bits 16
+    require_pc_bits_rule: $ => seq(
+      'require_pc_bits',
+      field('bits', $.number)
+    ),
+
+    // include RV32I or include SLLI {shamt = 5'b00000}
+    include_rule: $ => seq(
+      'include',
+      field('expr', choice(
+        $.identifier,
+        seq(
+          field('name', $.identifier),
+          optional(field('constraints', $.field_constraints))
+        )
+      ))
+    ),
+
+    // forbid MUL or forbid SLLI {shamt = 5'b00000}
+    forbid_rule: $ => seq(
+      'forbid',
+      field('expr', choice(
+        $.identifier,
+        seq(
+          field('name', $.identifier),
+          optional(field('constraints', $.field_constraints))
+        )
+      ))
     ),
 
     register_range: $ => seq(
@@ -71,6 +111,7 @@ module.exports = grammar({
       field('field', $.identifier),
       '=',
       field('value', choice(
+        $.bit_pattern,
         $.wildcard,
         $.number,
         $.register_name,
@@ -99,6 +140,9 @@ module.exports = grammar({
       /0[bB][01_]+/,          // Binary
       /[0-9][0-9_]*/          // Decimal
     ),
+
+    // Bit pattern: 5'b00xxx, 12'b0000_xxxx_xxxx
+    bit_pattern: $ => /[0-9]+\'[bB][01xX_]+/,
 
     wildcard: $ => choice('*', 'x', '_'),
 
