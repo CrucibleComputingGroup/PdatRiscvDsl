@@ -27,13 +27,17 @@ from enum import Enum
 
 class TokenType(Enum):
     # Keywords
+    VERSION = "version"
     REQUIRE = "require"
     REQUIRE_REGISTERS = "require_registers"
     REQUIRE_PC_BITS = "require_pc_bits"
     INSTRUCTION = "instruction"
+    ALLOW = "allow"
+    INCLUDE = "include"
+    FORBID = "forbid"
     PATTERN = "pattern"
     MASK = "mask"
-    
+
     # Timing parameters
     INSTR_HIT_LATENCY = "instr_hit_latency"
     INSTR_MISS_LATENCY = "instr_miss_latency"
@@ -46,6 +50,7 @@ class TokenType(Enum):
     NUMBER = "number"
     WILDCARD = "wildcard"
     DTYPE = "dtype"  # Data type token (i8, u16, etc.)
+    BIT_PATTERN = "bit_pattern"  # Bit pattern like 5'b00xxx
 
     # Symbols
     LBRACE = "{"
@@ -57,6 +62,8 @@ class TokenType(Enum):
     DASH = "-"
     PIPE = "|"
     TILDE = "~"
+    APOSTROPHE = "'"
+    IN = "in"
 
     # Other
     COMMENT = "comment"
@@ -226,16 +233,115 @@ class DataTypeSet:
         return f"DataTypeSet({self})"
 
 @dataclass
+class RangeValue:
+    """Represents a range constraint like x0-x15 or 0-15
+
+    Syntax: <start>-<end>
+    - start: Register name or number (e.g., x0, 0)
+    - end: Register name or number (e.g., x15, 15)
+
+    Example: x0-x15 represents register range [0, 15]
+    """
+    min_val: int  # Minimum value (inclusive)
+    max_val: int  # Maximum value (inclusive)
+
+    def __str__(self):
+        return f"x{self.min_val}-x{self.max_val}"
+
+    def __repr__(self):
+        return f"RangeValue({self.min_val}, {self.max_val})"
+
+@dataclass
+class BitPattern:
+    """Represents a bit pattern constraint like 5'b00xxx
+
+    Syntax: N'b[01xX_]+
+    - N: bit width (e.g., 5, 12)
+    - Pattern: string of 0, 1, x, X, or _ characters
+
+    Example: 5'b00xxx matches values 0-7 (bits [4:2] = 000, bits [1:0] = don't care)
+    """
+    width: int               # Number of bits (e.g., 5 for RV32 shift amounts)
+    pattern: str             # Pattern string (e.g., "00xxx")
+
+    def to_pattern_mask(self) -> tuple[int, int]:
+        """
+        Convert bit pattern to (pattern, mask) pair for matching.
+
+        Returns:
+            (pattern_val, mask_val) where:
+            - pattern_val: the bit values where pattern has 0/1
+            - mask_val: which bits to check (1 = check, 0 = don't care)
+
+        Example: 5'b00xxx
+        - pattern_val: 0b00000 (0x00)
+        - mask_val:    0b11000 (0x18) - only check bits where pattern has 0/1
+
+        Matching logic: (value & mask) == (pattern & mask)
+        """
+        if len(self.pattern) != self.width:
+            raise ValueError(f"Pattern length {len(self.pattern)} doesn't match width {self.width}")
+
+        pattern_val = 0
+        mask_val = 0
+
+        # Process pattern from left to right (MSB to LSB)
+        for i, bit in enumerate(self.pattern):
+            bit_pos = self.width - 1 - i  # Position from LSB
+
+            if bit == '1':
+                pattern_val |= (1 << bit_pos)
+                mask_val |= (1 << bit_pos)
+            elif bit == '0':
+                mask_val |= (1 << bit_pos)
+            elif bit in ('x', 'X', '_'):
+                pass  # Don't care - leave mask bit = 0
+            else:
+                raise ValueError(f"Invalid bit pattern character: '{bit}' (expected 0, 1, x, X, or _)")
+
+        return (pattern_val, mask_val)
+
+    def __str__(self):
+        return f"{self.width}'b{self.pattern}"
+
+    def __repr__(self):
+        return f"BitPattern({self})"
+
+@dataclass
 class FieldConstraint:
-    """Represents a field constraint like 'rd = x5' or 'opcode = 0x33' or 'dtype = i8 | u8'"""
+    """Represents a field constraint like 'rd = x5' or 'rd in x0-x15' or 'dtype = i8 | u8' or 'imm = 5'b00xxx'"""
     field_name: str
-    field_value: Union[str, int, DataTypeSet]  # Can be wildcard "*", register "x5", number, or data type set
+    field_value: Union[str, int, DataTypeSet, BitPattern, RangeValue]  # Can be wildcard "*", register "x5", number, data type set, bit pattern, or range
+
+@dataclass
+class VersionDirective:
+    """Version directive like 'version 2' specifying DSL version"""
+    version: int
+    line: int
 
 @dataclass
 class RequireRule:
-    """Require directive like 'require RV32I' specifying valid instruction extensions"""
+    """Require directive like 'require RV32I' specifying valid instruction extensions (v1 only)"""
     extension: str
     line: int
+
+@dataclass
+class IncludeRule:
+    """Include directive like 'include RV32I' or 'include SLLI {shamt = 5'b000xx}' (v2)"""
+    expr: Union[str, 'InstructionPattern']  # Extension name or instruction pattern
+    line: int
+
+@dataclass
+class ForbidRule:
+    """Forbid directive like 'forbid MUL' or 'forbid SLLI {shamt = 5'b000xx}' (v2)"""
+    expr: Union[str, 'InstructionPattern']  # Extension name or instruction pattern
+    line: int
+
+@dataclass
+class InstructionPattern:
+    """Instruction pattern for v2: name + constraints (used in IncludeRule/ForbidRule)"""
+    name: str
+    constraints: List[FieldConstraint]
 
 @dataclass
 class RegisterConstraintRule:
@@ -252,10 +358,11 @@ class PcConstraintRule:
 
 @dataclass
 class InstructionRule:
-    """High-level instruction rule like 'instruction MUL { rd = x0 }'"""
+    """High-level instruction rule like 'instruction MUL { rd = x0 }' or 'allow instruction SLLI { imm = 5'b00xxx }'"""
     name: str
     constraints: List[FieldConstraint]
     line: int
+    allow: bool = False  # True if this is an "allow" rule (positive constraint)
 
 @dataclass
 class PatternRule:
@@ -275,7 +382,8 @@ class TimingConstraintRule:
 @dataclass
 class Program:
     """Root AST node containing all rules"""
-    rules: List[Union[RequireRule, RegisterConstraintRule, PcConstraintRule, InstructionRule, PatternRule,TimingConstraintRule]]
+    version: Optional[int]  # DSL version (1 or 2), None means v1 (default)
+    rules: List[Union[VersionDirective, RequireRule, RegisterConstraintRule, PcConstraintRule, InstructionRule, PatternRule, TimingConstraintRule, IncludeRule, ForbidRule]]
 
 # ============================================================================
 # Lexer
@@ -362,6 +470,54 @@ class Lexer:
 
         return Token(TokenType.NUMBER, value, start_line, start_col)
 
+    def read_bit_pattern(self):
+        """Read a bit pattern like 5'b00xxx or 12'b0000_xxxx_xxxx
+
+        Format: <width>'b<pattern>
+        - width: decimal number (1-64)
+        - pattern: string of [01xX_]+ characters
+        """
+        start_line = self.line
+        start_col = self.column
+
+        # Read width (already started with digit)
+        width_str = ""
+        while self.peek() and self.peek().isdigit():
+            width_str += self.peek()
+            self.advance()
+
+        try:
+            width = int(width_str)
+        except ValueError:
+            self.error(f"Invalid bit pattern width: {width_str}")
+
+        # Expect apostrophe
+        if self.peek() != "'":
+            self.error(f"Expected ' after width in bit pattern, got {self.peek()}")
+        self.advance()
+
+        # Expect 'b'
+        if self.peek() not in ('b', 'B'):
+            self.error(f"Expected 'b' after ' in bit pattern, got {self.peek()}")
+        self.advance()
+
+        # Read pattern (0, 1, x, X, _)
+        pattern = ""
+        while self.peek() and self.peek() in '01xX_':
+            if self.peek() != '_':  # Underscores are for readability, skip them
+                pattern += self.peek()
+            self.advance()
+
+        if not pattern:
+            self.error("Bit pattern cannot be empty")
+
+        # Validate pattern length matches width
+        if len(pattern) != width:
+            self.error(f"Bit pattern length {len(pattern)} doesn't match declared width {width}")
+
+        # Return as tuple (width, pattern)
+        return Token(TokenType.BIT_PATTERN, (width, pattern), start_line, start_col)
+
     def read_identifier(self):
         """Read an identifier or keyword"""
         start_line = self.line
@@ -373,7 +529,9 @@ class Lexer:
             self.advance()
 
         # Check if it's a keyword
-        if ident == "require":
+        if ident == "version":
+            return Token(TokenType.VERSION, ident, start_line, start_col)
+        elif ident == "require":
             return Token(TokenType.REQUIRE, ident, start_line, start_col)
         elif ident == "require_registers":
             return Token(TokenType.REQUIRE_REGISTERS, ident, start_line, start_col)
@@ -381,6 +539,14 @@ class Lexer:
             return Token(TokenType.REQUIRE_PC_BITS, ident, start_line, start_col)
         elif ident == "instruction":
             return Token(TokenType.INSTRUCTION, ident, start_line, start_col)
+        elif ident == "allow":
+            return Token(TokenType.ALLOW, ident, start_line, start_col)
+        elif ident == "include":
+            return Token(TokenType.INCLUDE, ident, start_line, start_col)
+        elif ident == "forbid":
+            return Token(TokenType.FORBID, ident, start_line, start_col)
+        elif ident == "in":
+            return Token(TokenType.IN, ident, start_line, start_col)
         elif ident == "pattern":
             return Token(TokenType.PATTERN, ident, start_line, start_col)
         elif ident == "mask":
@@ -490,9 +656,25 @@ class Lexer:
                 self.advance()
                 continue
 
-            # Numbers
+            # Numbers or bit patterns (N'bXXX)
             if ch.isdigit():
-                tokens.append(self.read_number())
+                # Look ahead to check if this is a bit pattern
+                # Bit pattern format: N'b[01xX_]+
+                temp_pos = self.pos
+                temp_line = self.line
+                temp_col = self.column
+
+                # Scan ahead for digits
+                while temp_pos < len(self.text) and self.text[temp_pos].isdigit():
+                    temp_pos += 1
+
+                # Check if followed by 'b or 'B
+                if temp_pos + 1 < len(self.text) and self.text[temp_pos] == "'" and self.text[temp_pos + 1] in 'bB':
+                    # This is a bit pattern
+                    tokens.append(self.read_bit_pattern())
+                else:
+                    # Regular number
+                    tokens.append(self.read_number())
                 continue
 
             # Identifiers and keywords
@@ -541,13 +723,23 @@ class Parser:
     def parse(self) -> Program:
         """Parse the entire program"""
         rules = []
+        version = None
 
         while self.peek() and self.peek().type != TokenType.EOF:
             rule = self.parse_rule()
             if rule:
+                # Extract version if present (must be first directive)
+                if isinstance(rule, VersionDirective):
+                    if version is not None:
+                        self.error(f"Multiple version directives found (line {rule.line})")
+                    if len(rules) > 0:
+                        self.error(f"Version directive must be the first statement (line {rule.line})")
+                    version = rule.version
+                    # Don't add VersionDirective to rules list
+                    continue
                 rules.append(rule)
 
-        return Program(rules)
+        return Program(version, rules)
 
     def parse_rule(self) -> Optional[Union[RequireRule, RegisterConstraintRule, PcConstraintRule, InstructionRule, PatternRule,TimingConstraintRule]]:
         """Parse a single rule"""
@@ -556,22 +748,30 @@ class Parser:
         if not tok or tok.type == TokenType.EOF:
             return None
 
-        if tok.type == TokenType.REQUIRE:
+        if tok.type == TokenType.VERSION:
+            return self.parse_version_directive()
+        elif tok.type == TokenType.INCLUDE:
+            return self.parse_include_rule()
+        elif tok.type == TokenType.FORBID:
+            return self.parse_forbid_rule()
+        elif tok.type == TokenType.REQUIRE:
             return self.parse_require_rule()
         elif tok.type == TokenType.REQUIRE_REGISTERS:
             return self.parse_register_constraint_rule()
         elif tok.type == TokenType.REQUIRE_PC_BITS:
             return self.parse_pc_constraint_rule()
+        elif tok.type == TokenType.ALLOW:
+            return self.parse_instruction_rule(allow=True)
         elif tok.type == TokenType.INSTRUCTION:
-            return self.parse_instruction_rule()
+            return self.parse_instruction_rule(allow=False)
         elif tok.type == TokenType.PATTERN:
             return self.parse_pattern_rule()
-        elif tok.type in (TokenType.INSTR_HIT_LATENCY, TokenType.INSTR_MISS_LATENCY, 
-                         TokenType.DATA_HIT_LATENCY, TokenType.DATA_MISS_LATENCY, 
+        elif tok.type in (TokenType.INSTR_HIT_LATENCY, TokenType.INSTR_MISS_LATENCY,
+                         TokenType.DATA_HIT_LATENCY, TokenType.DATA_MISS_LATENCY,
                          TokenType.LOCALITY_BITS):
             return self.parse_timing_parameter_rule()
         else:
-            self.error(f"Expected 'require', 'require_registers', 'require_pc_bits', 'instruction' , 'timing parameter' or 'pattern', got {tok.type}")
+            self.error(f"Expected 'version', 'include', 'forbid', 'require', 'require_registers', 'require_pc_bits', 'allow', 'instruction', 'timing parameter' or 'pattern', got {tok.type}")
 
     def parse_require_rule(self) -> RequireRule:
         """Parse: require IDENTIFIER"""
@@ -647,16 +847,23 @@ class Parser:
 
         return PcConstraintRule(pc_bits, require_pc_tok.line)
 
-    def parse_instruction_rule(self) -> InstructionRule:
-        """Parse: instruction IDENTIFIER [ field_constraints ]"""
-        instr_tok = self.expect(TokenType.INSTRUCTION)
+    def parse_instruction_rule(self, allow: bool = False) -> InstructionRule:
+        """Parse: [allow] instruction IDENTIFIER [ field_constraints ]"""
+        if allow:
+            allow_tok = self.expect(TokenType.ALLOW)
+            instr_tok = self.expect(TokenType.INSTRUCTION)
+            line = allow_tok.line
+        else:
+            instr_tok = self.expect(TokenType.INSTRUCTION)
+            line = instr_tok.line
+
         name_tok = self.expect(TokenType.IDENTIFIER)
 
         constraints = []
         if self.peek() and self.peek().type == TokenType.LBRACE:
             constraints = self.parse_field_constraints()
 
-        return InstructionRule(name_tok.value, constraints, instr_tok.line)
+        return InstructionRule(name_tok.value, constraints, line, allow=allow)
 
     def parse_pattern_rule(self) -> PatternRule:
         """Parse: pattern NUMBER mask NUMBER [ COMMENT ]"""
@@ -700,7 +907,7 @@ class Parser:
         return constraints
 
     def parse_field_constraint(self) -> FieldConstraint:
-        """Parse: field_name = field_value
+        """Parse: field_name = field_value or field_name in range
 
         field_value can be:
         - wildcard: *, x, _
@@ -709,17 +916,32 @@ class Parser:
         - data type: i8, u16
         - data type set: i8 | u8 | i16
         - negated type: ~i16 or ~(i16 | u16)
+        - bit pattern: 5'b00xxx, 12'b0000_xxxx_xxxx
+        - range: x0-x15, 0-15 (with 'in' keyword)
         """
         field_name = self.expect(TokenType.IDENTIFIER)
+
+        # Check for 'in' keyword (range constraint)
+        if self.peek() and self.peek().type == TokenType.IN:
+            self.advance()  # consume 'in'
+            range_value = self.parse_range_value()
+            return FieldConstraint(field_name.value, range_value)
+
+        # Otherwise expect '=' for regular constraint
         self.expect(TokenType.EQUALS)
 
-        # Parse field value (wildcard, number, identifier, or data type set)
+        # Parse field value (wildcard, number, identifier, data type set, or bit pattern)
         value_tok = self.peek()
 
         if value_tok.type == TokenType.WILDCARD:
             value = self.advance().value
         elif value_tok.type == TokenType.NUMBER:
             value = self.advance().value
+        elif value_tok.type == TokenType.BIT_PATTERN:
+            # Bit pattern: token value is (width, pattern) tuple
+            bit_tok = self.advance()
+            width, pattern = bit_tok.value
+            value = BitPattern(width=width, pattern=pattern)
         elif value_tok.type == TokenType.DTYPE or value_tok.type == TokenType.TILDE:
             # Parse data type or data type set (i8 | u8 | i16 | ~i16 | ~(i16 | u16))
             value = self.parse_data_type_set()
@@ -733,6 +955,50 @@ class Parser:
             self.error(f"Expected field value, got {value_tok.type}")
 
         return FieldConstraint(field_name.value, value)
+
+    def parse_range_value(self) -> RangeValue:
+        """Parse range syntax: x0-x15 or 0-15
+
+        Expects: (register_name|number) - (register_name|number)
+        """
+        # Parse start of range
+        start_tok = self.peek()
+        if start_tok.type == TokenType.IDENTIFIER:
+            # Register name like "x0"
+            self.advance()
+            from .encodings import parse_register
+            min_val = parse_register(start_tok.value)
+            if min_val is None:
+                self.error(f"Invalid register name: {start_tok.value}")
+        elif start_tok.type == TokenType.NUMBER:
+            self.advance()
+            min_val = start_tok.value
+        else:
+            self.error(f"Expected register name or number in range, got {start_tok.type}")
+
+        # Expect dash
+        self.expect(TokenType.DASH)
+
+        # Parse end of range
+        end_tok = self.peek()
+        if end_tok.type == TokenType.IDENTIFIER:
+            # Register name like "x15"
+            self.advance()
+            from .encodings import parse_register
+            max_val = parse_register(end_tok.value)
+            if max_val is None:
+                self.error(f"Invalid register name: {end_tok.value}")
+        elif end_tok.type == TokenType.NUMBER:
+            self.advance()
+            max_val = end_tok.value
+        else:
+            self.error(f"Expected register name or number in range, got {end_tok.type}")
+
+        # Validate range
+        if min_val > max_val:
+            self.error(f"Invalid range: {min_val}-{max_val} (min > max)")
+
+        return RangeValue(min_val, max_val)
 
     def _looks_like_invalid_dtype(self, ident: str) -> bool:
         """Check if identifier looks like a data type but isn't valid"""
@@ -815,6 +1081,71 @@ class Parser:
             self.error(validation_error)
 
         return dtype_set
+
+    def parse_version_directive(self) -> VersionDirective:
+        """Parse: version NUMBER"""
+        version_tok = self.expect(TokenType.VERSION)
+        num_tok = self.expect(TokenType.NUMBER)
+
+        version = num_tok.value
+        if version not in (1, 2):
+            self.error(f"Unsupported DSL version: {version} (supported: 1, 2)")
+
+        return VersionDirective(version, version_tok.line)
+
+    def parse_include_rule(self) -> IncludeRule:
+        """Parse: include EXTENSION or include INSTRUCTION [constraints] or include * {constraints}"""
+        include_tok = self.expect(TokenType.INCLUDE)
+
+        # Check for wildcard
+        if self.peek() and self.peek().type == TokenType.WILDCARD:
+            name_tok = self.advance()
+            # Wildcard must have constraints
+            if self.peek() and self.peek().type == TokenType.LBRACE:
+                constraints = self.parse_field_constraints()
+                expr = InstructionPattern("*", constraints)
+            else:
+                self.error("Wildcard '*' must have field constraints")
+        else:
+            name_tok = self.expect(TokenType.IDENTIFIER)
+
+            # Check if there are constraints
+            if self.peek() and self.peek().type == TokenType.LBRACE:
+                # This is an instruction pattern with constraints
+                constraints = self.parse_field_constraints()
+                expr = InstructionPattern(name_tok.value, constraints)
+            else:
+                # This is just an extension or instruction name
+                expr = name_tok.value
+
+        return IncludeRule(expr, include_tok.line)
+
+    def parse_forbid_rule(self) -> ForbidRule:
+        """Parse: forbid EXTENSION or forbid INSTRUCTION [constraints] or forbid * {constraints}"""
+        forbid_tok = self.expect(TokenType.FORBID)
+
+        # Check for wildcard
+        if self.peek() and self.peek().type == TokenType.WILDCARD:
+            name_tok = self.advance()
+            # Wildcard must have constraints
+            if self.peek() and self.peek().type == TokenType.LBRACE:
+                constraints = self.parse_field_constraints()
+                expr = InstructionPattern("*", constraints)
+            else:
+                self.error("Wildcard '*' must have field constraints")
+        else:
+            name_tok = self.expect(TokenType.IDENTIFIER)
+
+            # Check if there are constraints
+            if self.peek() and self.peek().type == TokenType.LBRACE:
+                # This is an instruction pattern with constraints
+                constraints = self.parse_field_constraints()
+                expr = InstructionPattern(name_tok.value, constraints)
+            else:
+                # This is just an extension or instruction name
+                expr = name_tok.value
+
+        return ForbidRule(expr, forbid_tok.line)
 
 # ============================================================================
 # Main / Testing

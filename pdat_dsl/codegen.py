@@ -15,13 +15,17 @@ import sys
 import argparse
 from typing import List, Tuple, Set, Optional
 from pathlib import Path
-from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule, PcConstraintRule, DataTypeSet, TimingConstraintRule
+from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule, PcConstraintRule, DataTypeSet, BitPattern, TimingConstraintRule, IncludeRule, ForbidRule, InstructionPattern, RangeValue
 from .encodings import (
     get_instruction_encoding, parse_register, set_field, create_field_mask,
     get_extension_instructions
 )
 from .dtype_codegen import generate_dtype_check_expr, generate_dtype_set_check_expr
 from .config import CoreConfig, ModuleConfig, SignalConfig, load_config
+from .bdd_ops import (
+    get_bdd_manager, pattern_to_bdd, field_range_to_bdd, field_equals_to_bdd,
+    bdd_to_patterns, bdd_size
+)
 
 
 def has_c_extension_required(rules: List) -> bool:
@@ -33,12 +37,378 @@ def has_c_extension_required(rules: List) -> bool:
     return False
 
 
+def generate_complementary_patterns(allowed_pattern: int, allowed_mask: int, base_pattern: int, base_mask: int, field_pos: int, field_width: int) -> List[Tuple[int, int, str]]:
+    """
+    Generate patterns that forbid everything EXCEPT the allowed pattern.
+
+    For an 'allow' rule, we need to generate patterns that outlaw all other values
+    in the constrained field while keeping the rest of the instruction encoding the same.
+
+    Args:
+        allowed_pattern: The pattern value that IS allowed
+        allowed_mask: The mask for the allowed pattern (which bits are constrained)
+        base_pattern: The instruction's base pattern
+        base_mask: The instruction's base mask
+        field_pos: Position of the field in the instruction
+        field_width: Width of the field in bits
+
+    Returns:
+        List of (pattern, mask, description) tuples that forbid all values except allowed
+    """
+    complementary = []
+
+    # For each possible value in the field
+    max_value = (1 << field_width) - 1
+    for value in range(max_value + 1):
+        # Check if this value matches the allowed pattern
+        if (value & (allowed_mask >> field_pos)) == ((allowed_pattern >> field_pos) & (allowed_mask >> field_pos)):
+            # This value is allowed, skip it
+            continue
+
+        # This value should be forbidden - create a pattern for it
+        forbidden_pattern = base_pattern | (value << field_pos)
+        forbidden_mask = base_mask | ((1 << field_width) - 1) << field_pos  # Check all bits of the field
+
+        complementary.append((forbidden_pattern, forbidden_mask, f"complement value {value}"))
+
+    return complementary
+
+
+def expand_instruction_pattern_v2_bdd(pattern: InstructionPattern, use_bdd: bool = False):
+    """
+    Expand an InstructionPattern to a BDD or set of tuples.
+
+    Args:
+        pattern: InstructionPattern with name and constraints
+        use_bdd: If True, return BDD; if False, return Set[Tuple] (legacy)
+
+    Returns:
+        BDD if use_bdd=True, otherwise Set[Tuple[int, int, str, bool]]
+    """
+    # Handle wildcard - matches all instructions (or all with constraints)
+    if pattern.name == "*":
+        width = 32  # Default to 32-bit for wildcard
+        bdd_mgr = get_bdd_manager(width)
+
+        # Start with TRUE (all instructions)
+        base_bdd = bdd_mgr.true
+
+        # Apply field constraints to narrow down
+        # For wildcard, we just apply the constraints without a base pattern
+        for constraint in pattern.constraints:
+            field_name = constraint.field_name
+            field_value = constraint.field_value
+
+            # For wildcard, assume standard RISC-V register field positions
+            # rd: [11:7], rs1: [19:15], rs2: [24:20]
+            field_map = {
+                "rd": (7, 5),
+                "rs1": (15, 5),
+                "rs2": (20, 5),
+            }
+
+            if field_name not in field_map:
+                print(f"Warning: Field '{field_name}' not supported for wildcard patterns (use rd, rs1, rs2)")
+                continue
+
+            field_pos, field_width = field_map[field_name]
+
+            # Handle range constraints
+            if isinstance(field_value, RangeValue):
+                range_bdd = field_range_to_bdd(field_pos, field_width,
+                                               field_value.min_val, field_value.max_val, width)
+                base_bdd &= range_bdd
+                continue
+
+        if use_bdd:
+            return base_bdd
+
+        # Convert to patterns (for wildcard, this might be many patterns)
+        patterns = bdd_to_patterns(base_bdd, width, max_patterns=10000)
+        result = set()
+        for p, m, _ in patterns:
+            result.add((p, m, f"* {pattern.constraints}", False))
+        return result
+
+    # Regular instruction (non-wildcard)
+    encoding = get_instruction_encoding(pattern.name)
+    if not encoding:
+        print(f"Warning: Unknown instruction '{pattern.name}', skipping")
+        if use_bdd:
+            bdd = get_bdd_manager(32)
+            return bdd.false
+        return set()
+
+    width = 16 if encoding.is_compressed else 32
+    bdd_mgr = get_bdd_manager(width)
+
+    # Start with base instruction pattern as BDD
+    base_bdd = pattern_to_bdd(encoding.base_pattern, encoding.base_mask, width)
+
+    # Apply each constraint
+    for constraint in pattern.constraints:
+        field_name = constraint.field_name
+        field_value = constraint.field_value
+
+        # Skip dtype constraints
+        if field_name == 'dtype' or field_name.endswith('_dtype'):
+            continue
+
+        if field_name not in encoding.fields:
+            print(f"Warning: Field '{field_name}' not valid for {pattern.name}")
+            continue
+
+        field_pos, field_width = encoding.fields[field_name]
+
+        # Handle range constraints (NEW with BDD!)
+        if isinstance(field_value, RangeValue):
+            range_bdd = field_range_to_bdd(field_pos, field_width,
+                                           field_value.min_val, field_value.max_val, width)
+            base_bdd &= range_bdd
+            continue
+
+        # Handle bit patterns
+        if isinstance(field_value, BitPattern):
+            if field_value.width != field_width:
+                print(f"Error: Bit pattern width {field_value.width} != field width {field_width}")
+                continue
+
+            pattern_val, pattern_mask = field_value.to_pattern_mask()
+            # Create BDD for this bit pattern
+            pattern_bdd = pattern_to_bdd(pattern_val << field_pos, pattern_mask << field_pos, width)
+            base_bdd &= pattern_bdd
+            continue
+
+        # Handle exact values (wildcards, registers, numbers)
+        if field_value in ('*', 'x', '_'):
+            # Wildcard - no constraint, BDD unchanged
+            continue
+
+        # Handle registers
+        if field_name in ('rd', 'rs1', 'rs2'):
+            reg_num = parse_register(field_value)
+            if reg_num is None:
+                if isinstance(field_value, int):
+                    reg_num = field_value
+                else:
+                    print(f"Warning: Invalid register '{field_value}'")
+                    continue
+            field_value = reg_num
+
+        # Handle numeric values
+        if isinstance(field_value, str):
+            try:
+                if field_value.startswith('0x'):
+                    field_value = int(field_value, 16)
+                elif field_value.startswith('0b'):
+                    field_value = int(field_value, 2)
+                else:
+                    field_value = int(field_value)
+            except ValueError:
+                print(f"Warning: Cannot parse field value '{field_value}'")
+                continue
+
+        # Create BDD for field == value
+        eq_bdd = field_equals_to_bdd(field_pos, field_width, field_value, width)
+        base_bdd &= eq_bdd
+
+    if use_bdd:
+        return base_bdd
+
+    # Legacy: Convert BDD back to pattern set
+    patterns = bdd_to_patterns(base_bdd, width)
+    desc = f"{pattern.name}"
+    if pattern.constraints:
+        constraint_strs = [f"{c.field_name}={c.field_value}" for c in pattern.constraints]
+        desc += " { " + ", ".join(constraint_strs) + " }"
+
+    result = set()
+    for p, m, _ in patterns:
+        result.add((p, m, desc, encoding.is_compressed))
+    return result
+
+
+def expand_instruction_pattern_v2(pattern: InstructionPattern) -> Set[Tuple[int, int, str, bool]]:
+    """
+    Expand an InstructionPattern to a set of (pattern, mask, description, is_compressed) tuples.
+
+    For v2, this generates all instruction instances matching the pattern constraints.
+    Similar to instruction_rule_to_pattern but returns a set and handles v2 semantics.
+    """
+    encoding = get_instruction_encoding(pattern.name)
+    if not encoding:
+        print(f"Warning: Unknown instruction '{pattern.name}', skipping")
+        return set()
+
+    # Start with base pattern/mask
+    base_pattern = encoding.base_pattern
+    base_mask = encoding.base_mask
+
+    # Apply constraints
+    for constraint in pattern.constraints:
+        field_name = constraint.field_name
+        field_value = constraint.field_value
+
+        # Skip dtype constraints
+        if field_name == 'dtype' or field_name.endswith('_dtype'):
+            continue
+
+        if field_name not in encoding.fields:
+            print(f"Warning: Field '{field_name}' not valid for {pattern.name}")
+            continue
+
+        field_pos, field_width = encoding.fields[field_name]
+
+        # Handle bit patterns
+        if isinstance(field_value, BitPattern):
+            if field_value.width != field_width:
+                print(f"Error: Bit pattern width {field_value.width} != field width {field_width}")
+                continue
+
+            pattern_val, pattern_mask = field_value.to_pattern_mask()
+            base_pattern = set_field(base_pattern, field_pos, field_width, pattern_val)
+            base_mask = base_mask | (pattern_mask << field_pos)
+            continue
+
+        # Handle wildcards
+        if field_value in ('*', 'x', '_'):
+            field_mask = create_field_mask(field_pos, field_width)
+            base_mask = base_mask & ~field_mask
+            continue
+
+        # Handle registers
+        if field_name in ('rd', 'rs1', 'rs2'):
+            reg_num = parse_register(field_value)
+            if reg_num is None:
+                if isinstance(field_value, int):
+                    reg_num = field_value
+                else:
+                    print(f"Warning: Invalid register '{field_value}'")
+                    continue
+            field_value = reg_num
+
+        # Handle numeric values
+        if isinstance(field_value, str):
+            try:
+                if field_value.startswith('0x'):
+                    field_value = int(field_value, 16)
+                elif field_value.startswith('0b'):
+                    field_value = int(field_value, 2)
+                else:
+                    field_value = int(field_value)
+            except ValueError:
+                print(f"Warning: Cannot parse field value '{field_value}'")
+                continue
+
+        base_pattern = set_field(base_pattern, field_pos, field_width, field_value)
+        base_mask = base_mask | create_field_mask(field_pos, field_width)
+
+    desc = f"{pattern.name}"
+    if pattern.constraints:
+        constraint_strs = [f"{c.field_name}={c.field_value}" for c in pattern.constraints]
+        desc += " { " + ", ".join(constraint_strs) + " }"
+
+    return {(base_pattern, base_mask, desc, encoding.is_compressed)}
+
+
+def expand_expr_v2_bdd(expr, has_c_ext: bool = False, width: int = 32):
+    """
+    Expand a v2 expression to a BDD representing the instruction language.
+
+    Args:
+        expr: Either a string (extension/instruction name) or InstructionPattern
+        has_c_ext: Whether C extension is required
+        width: Instruction width (32 or 16)
+
+    Returns:
+        BDD representing all instructions matching the expression
+    """
+    bdd_mgr = get_bdd_manager(width)
+
+    if isinstance(expr, str):
+        # Extension name or bare instruction name
+        instructions = get_extension_instructions(expr)
+
+        if instructions:
+            # It's an extension - OR together all instruction BDDs
+            result = bdd_mgr.false
+            for instr_name in instructions:
+                encoding = get_instruction_encoding(instr_name)
+                if encoding:
+                    instr_width = 16 if encoding.is_compressed else 32
+                    if instr_width == width:  # Only include instructions of matching width
+                        instr_bdd = pattern_to_bdd(encoding.base_pattern, encoding.base_mask, instr_width)
+                        result |= instr_bdd
+            return result
+        else:
+            # Try as instruction name
+            encoding = get_instruction_encoding(expr)
+            if encoding:
+                instr_width = 16 if encoding.is_compressed else 32
+                if instr_width == width:
+                    return pattern_to_bdd(encoding.base_pattern, encoding.base_mask, instr_width)
+                else:
+                    return bdd_mgr.false
+            else:
+                print(f"Warning: Unknown extension or instruction '{expr}'")
+                return bdd_mgr.false
+
+    elif isinstance(expr, InstructionPattern):
+        # Instruction with constraints - use BDD expansion
+        return expand_instruction_pattern_v2_bdd(expr, use_bdd=True)
+    else:
+        print(f"Warning: Invalid expression type: {type(expr)}")
+        return bdd_mgr.false
+
+
+def expand_expr_v2(expr, has_c_ext: bool = False) -> Set[Tuple[int, int, str, bool]]:
+    """
+    Expand a v2 expression to a set of instruction patterns.
+
+    Args:
+        expr: Either a string (extension name) or InstructionPattern
+        has_c_ext: Whether C extension is required
+
+    Returns:
+        Set of (pattern, mask, description, is_compressed) tuples
+    """
+    if isinstance(expr, str):
+        # Extension name or bare instruction name
+        # Check if it's an extension
+        instructions = get_extension_instructions(expr)
+        if instructions:
+            # It's an extension - expand to all instructions
+            result = set()
+            for instr_name in instructions:
+                encoding = get_instruction_encoding(instr_name)
+                if encoding:
+                    result.add((encoding.base_pattern, encoding.base_mask, instr_name, encoding.is_compressed))
+            return result
+        else:
+            # Try as instruction name
+            encoding = get_instruction_encoding(expr)
+            if encoding:
+                return {(encoding.base_pattern, encoding.base_mask, expr, encoding.is_compressed)}
+            else:
+                print(f"Warning: Unknown extension or instruction '{expr}'")
+                return set()
+    elif isinstance(expr, InstructionPattern):
+        # Instruction with constraints
+        return expand_instruction_pattern_v2(expr)
+    else:
+        print(f"Warning: Invalid expression type: {type(expr)}")
+        return set()
+
+
 def instruction_rule_to_pattern(rule: InstructionRule, has_c_ext: bool = False) -> List[Tuple[int, int, str, bool]]:
     """
     Convert an InstructionRule to one or more (pattern, mask, description, is_compressed) tuples.
 
     Returns a list because some rules with wildcards might expand to multiple patterns.
     When has_c_ext is True, auto-expands to include compressed versions of instructions.
+
+    For 'allow' rules (rule.allow=True), generates complementary patterns that forbid
+    everything EXCEPT the allowed pattern.
     """
     results = []
 
@@ -51,6 +421,13 @@ def instruction_rule_to_pattern(rule: InstructionRule, has_c_ext: bool = False) 
     # Start with the base pattern and mask
     pattern = encoding.base_pattern
     mask = encoding.base_mask
+
+    # Track if we're constraining a field with a bit pattern (for allow semantics)
+    constrained_field = None
+    constrained_field_pos = None
+    constrained_field_width = None
+    constrained_pattern = None
+    constrained_mask = None
 
     # Apply field constraints
     for constraint in rule.constraints:
@@ -70,6 +447,33 @@ def instruction_rule_to_pattern(rule: InstructionRule, has_c_ext: bool = False) 
             continue
 
         field_pos, field_width = encoding.fields[field_name]
+
+        # Handle bit patterns
+        if isinstance(field_value, BitPattern):
+            # Validate width matches field width
+            if field_value.width != field_width:
+                print(f"Error at line {rule.line}: Bit pattern width {field_value.width} doesn't match field width {field_width} for {field_name} in {rule.name}")
+                continue
+
+            # Convert bit pattern to pattern/mask
+            try:
+                pattern_val, pattern_mask = field_value.to_pattern_mask()
+
+                # For 'allow' rules, save the constrained field info
+                if rule.allow:
+                    constrained_field = field_name
+                    constrained_field_pos = field_pos
+                    constrained_field_width = field_width
+                    constrained_pattern = pattern
+                    constrained_mask = mask
+
+                # Apply to instruction pattern/mask
+                pattern = set_field(pattern, field_pos, field_width, pattern_val)
+                mask = mask | (pattern_mask << field_pos)
+                continue
+            except ValueError as e:
+                print(f"Error at line {rule.line}: Invalid bit pattern for {field_name}: {e}")
+                continue
 
         # Handle wildcards - don't add to mask
         if field_value in ('*', 'x', '_'):
@@ -587,20 +991,80 @@ def generate_timing_constraints(instr_hit_latency, instr_miss_latency,
     return code
 
 
+def generate_inline_assumptions_bdd(sigma_bdd, register_constraint=None, pc_bits=None, config=None):
+    """
+    Generate SystemVerilog assumptions from a BDD (v2 with BDD mode).
+
+    Args:
+        sigma_bdd: BDD expression representing allowed instructions
+        register_constraint: Register range constraint if specified
+        pc_bits: Number of PC address bits
+        config: Core configuration
+
+    Returns:
+        SystemVerilog code string
+    """
+    if config is None:
+        from .config import CoreConfig
+        config = CoreConfig.default_ibex()
+
+    from .bdd_ops import bdd_to_systemverilog_function
+
+    instr_data = config.signals.instruction_data
+    has_compressed_check = config.signals.has_compressed_check
+
+    code = "\n  // ========================================\n"
+    code += "  // Auto-generated instruction constraints\n"
+    code += f"  // Target core: {config.core_name} ({config.architecture})\n"
+    code += f"  // Inject into: {config.injection.module_path}\n"
+    code += f"  // Location: {config.injection.description}\n"
+    code += "  // Generated from BDD (Binary Decision Diagram)\n"
+    code += "  // ========================================\n\n"
+
+    # Add PC constraint if specified
+    if pc_bits is not None:
+        addr_space_kb = (2 ** pc_bits) // 1024
+        code += f"  // PC address space constraint: {pc_bits}-bit address space ({addr_space_kb}KB)\n"
+        code += "  always_comb begin\n"
+        code += f"    assume (!rst_ni || {config.signals.pc}[31:{pc_bits}] == {32-pc_bits}'b0);\n"
+        code += "  end\n\n"
+
+    # Generate function from BDD
+    code += "  // BDD-based constraint function\n"
+    func_code = bdd_to_systemverilog_function(sigma_bdd, "matches_allowed_instruction", "instr", 32)
+    code += func_code
+    code += "\n"
+
+    # Use function in assumption
+    code += "  // Instruction must match allowed set\n"
+    code += "  always_comb begin\n"
+    if has_compressed_check:
+        code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || matches_allowed_instruction({instr_data}));\n"
+    else:
+        code += f"    assume (!rst_ni || matches_allowed_instruction({instr_data}));\n"
+    code += "  end\n\n"
+
+    # TODO: Add register constraints if specified
+
+    return code
+
+
 def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
                                 register_constraint: Optional[RegisterConstraintRule] = None,
                                 pc_bits: Optional[int] = None,
                                 config: Optional[CoreConfig] = None,
-                                instruction_rules: Optional[List[InstructionRule]] = None):
+                                instruction_rules: Optional[List[InstructionRule]] = None,
+                                v2_mode: bool = False):
     """Generate assumptions to inject directly into ID stage (no separate module).
 
     Args:
         patterns: List of (pattern, mask, description, is_compressed) tuples
-        required_extensions: Set of required RISC-V extensions
+        required_extensions: Set of required RISC-V extensions (v1 only)
         register_constraint: Register range constraint if specified
         pc_bits: Number of PC address bits (e.g., 16 for 64KB). If provided, constrains PC[31:pc_bits] to 0
         config: Core configuration (defaults to Ibex if not provided)
         instruction_rules: List of instruction rules (for data type constraint generation)
+        v2_mode: If True, generate positive assertions (allow ONLY these patterns) for DSL v2
     """
     if config is None:
         config = CoreConfig.default_ibex()
@@ -727,7 +1191,68 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         if dtype_code:
             code += dtype_code
 
-    # Generate positive constraints from required extensions
+    # V2: Generate positive assertions (allow ONLY these patterns)
+    if v2_mode:
+        if not patterns:
+            code += "  // V2: No instructions allowed (empty instruction set)\n\n"
+            return code
+
+        # Separate patterns by compression
+        patterns_32bit = []
+        patterns_16bit = []
+        for item in patterns:
+            if len(item) == 4:
+                pattern, mask, desc, is_compressed = item
+            else:
+                pattern, mask, desc = item
+                is_compressed = False
+
+            if is_compressed:
+                patterns_16bit.append((pattern, mask, desc))
+            else:
+                patterns_32bit.append((pattern, mask, desc))
+
+        code += "  // V2: Positive assertion - instruction must be one of these allowed patterns\n"
+        code += f"  // Allowed instruction set: {len(patterns)} patterns\n"
+
+        # Generate 32-bit instruction positive constraint
+        if patterns_32bit:
+            code += "  // 32-bit instructions: allow ONLY these patterns\n"
+            code += "  always_comb begin\n"
+            if has_compressed_check:
+                code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || (\n"
+            else:
+                code += f"    assume (!rst_ni || (\n"
+
+            # Generate OR of all allowed patterns
+            for i, (pattern, mask, desc) in enumerate(patterns_32bit):
+                is_last = (i == len(patterns_32bit) - 1)
+                connector = "" if is_last else " ||"
+                code += f"      (({instr_data}[{data_width-1}:0] & {data_width}'h{mask:08x}) == {data_width}'h{pattern:08x}){connector}  // {desc}\n"
+
+            if has_compressed_check:
+                code += "    ));\n"
+            else:
+                code += "    );\n"
+            code += "  end\n\n"
+
+        # Generate 16-bit compressed instruction positive constraint
+        if patterns_16bit:
+            code += "  // 16-bit compressed instructions: allow ONLY these patterns\n"
+            code += "  always_comb begin\n"
+            code += f"    assume (!rst_ni || ({instr_data}[1:0] == 2'b11) || (\n"
+
+            for i, (pattern, mask, desc) in enumerate(patterns_16bit):
+                is_last = (i == len(patterns_16bit) - 1)
+                connector = "" if is_last else " ||"
+                code += f"      (({instr_data}[15:0] & 16'h{mask:04x}) == 16'h{pattern:04x}){connector}  // {desc}\n"
+
+            code += "    ));\n"
+            code += "  end\n\n"
+
+        return code
+
+    # V1: Generate positive constraints from required extensions
     valid_patterns = []  # Define at this scope so it's accessible later
     if required_extensions:
         code += "  // Positive constraint: instruction must be from required extensions\n"
@@ -830,6 +1355,93 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
     return code
 
 
+def process_v2_rules_bdd(rules: List, has_c_ext: bool = False, use_bdd: bool = True) -> List[Tuple[int, int, str, bool]]:
+    """
+    Process v2 rules sequentially using BDD operations.
+
+    V2 Semantics with BDDs:
+        σ₀ = ∅ (BDD.false)
+        include e: σ := σ ∨ ⟦e⟧  (BDD OR)
+        forbid e:  σ := σ ∧ ¬⟦e⟧ (BDD AND NOT)
+
+    Args:
+        rules: List of v2 rules (IncludeRule, ForbidRule, etc.)
+        has_c_ext: Whether C extension is required
+        use_bdd: If True, use BDD operations; if False, use legacy set operations
+
+    Returns:
+        List of (pattern, mask, description, is_compressed) tuples
+    """
+    if not use_bdd:
+        # Fall back to legacy implementation
+        return list(process_v2_rules(rules, has_c_ext))
+
+    bdd_mgr = get_bdd_manager(32)
+    sigma = bdd_mgr.false  # σ₀ = ∅ (empty language)
+
+    print("Processing v2 rules sequentially (using BDDs)...")
+
+    for i, rule in enumerate(rules, 1):
+        if isinstance(rule, IncludeRule):
+            expr_bdd = expand_expr_v2_bdd(rule.expr, has_c_ext, width=32)
+            sigma = sigma | expr_bdd  # σ := σ ∪ ⟦e⟧
+            count = bdd_size(sigma, 32)
+            print(f"  {i}. include: σ now contains {count} instructions")
+
+        elif isinstance(rule, ForbidRule):
+            expr_bdd = expand_expr_v2_bdd(rule.expr, has_c_ext, width=32)
+            old_count = bdd_size(sigma, 32)
+            sigma = sigma & ~expr_bdd  # σ := σ ∧ ¬⟦e⟧
+            new_count = bdd_size(sigma, 32)
+            removed = old_count - new_count
+            print(f"  {i}. forbid: removed {removed} instructions, σ now contains {new_count}")
+
+    final_count = bdd_size(sigma, 32)
+    print(f"Final instruction set: {final_count} instructions")
+
+    # Return the BDD itself instead of converting to patterns
+    # The caller will generate SV directly from the BDD
+    return sigma  # Return BDD expression
+
+
+def process_v2_rules(rules: List, has_c_ext: bool = False) -> Set[Tuple[int, int, str, bool]]:
+    """
+    Process v2 rules sequentially using set operations.
+
+    V2 Semantics:
+        σ₀ = ∅ (start with empty set)
+        include e: σ := σ ∪ ⟦e⟧
+        forbid e:  σ := σ \ ⟦e⟧
+
+    Args:
+        rules: List of v2 rules (IncludeRule, ForbidRule, etc.)
+        has_c_ext: Whether C extension is required
+
+    Returns:
+        Final set of allowed instruction patterns
+    """
+    sigma = set()  # Start with empty set
+
+    print("Processing v2 rules sequentially...")
+
+    for i, rule in enumerate(rules, 1):
+        if isinstance(rule, IncludeRule):
+            expanded = expand_expr_v2(rule.expr, has_c_ext)
+            sigma = sigma | expanded
+            print(f"  {i}. include: Added {len(expanded)} patterns, total now: {len(sigma)}")
+
+        elif isinstance(rule, ForbidRule):
+            expanded = expand_expr_v2(rule.expr, has_c_ext)
+            removed = sigma & expanded
+            sigma = sigma - expanded
+            print(f"  {i}. forbid: Removed {len(removed)} patterns, total now: {len(sigma)}")
+
+        # Ignore non-v2 rules (config rules handled separately)
+
+    print(f"Final instruction set: {len(sigma)} patterns")
+    return sigma
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Generate inline SystemVerilog assumptions from instruction DSL'
@@ -863,10 +1475,85 @@ def main():
 
     print(f"Found {len(ast.rules)} rules")
 
+    # Check DSL version
+    dsl_version = ast.version if ast.version is not None else 1
+    print(f"DSL version: {dsl_version}")
+
     # Check if C extension is required
     has_c_ext = has_c_extension_required(ast.rules)
     if has_c_ext:
         print("C extension detected - will auto-expand compressed instructions")
+
+    # Route to appropriate code generation based on version
+    if dsl_version == 2:
+        # V2: Sequential evaluation with include/forbid
+        print("Using v2 semantics (sequential include/forbid)")
+
+        # Extract config rules (still apply in v2)
+        register_constraint = None
+        pc_constraint = None
+        timing_constraint = None
+        instruction_rules = []  # For dtype processing
+
+        for rule in ast.rules:
+            if isinstance(rule, RegisterConstraintRule):
+                if register_constraint is not None:
+                    print(f"Warning: Multiple register constraints found, using the last one (x{rule.min_reg}-x{rule.max_reg})")
+                register_constraint = rule
+            elif isinstance(rule, PcConstraintRule):
+                if pc_constraint is not None:
+                    print(f"Warning: Multiple PC constraints found, using the last one ({rule.pc_bits} bits)")
+                pc_constraint = rule
+            elif isinstance(rule, TimingConstraintRule):
+                if timing_constraint is None:
+                    timing_constraint = {}
+                timing_constraint[rule.param_name] = rule.value
+
+        # Process v2 rules sequentially (using set-based approach for explicit patterns)
+        # BDD mode generates compact functions but loses pattern visibility for debugging
+        # Use set-based approach to generate explicit pattern matching with detailed comments
+        sigma_patterns = process_v2_rules_bdd(ast.rules, has_c_ext, use_bdd=False)
+
+        print(f"Final instruction set: {len(sigma_patterns)} patterns")
+
+        required_extensions = set()  # Not used in v2, but keep for compatibility
+        if register_constraint:
+            print(f"Register constraint: x{register_constraint.min_reg}-x{register_constraint.max_reg}")
+        if pc_constraint:
+            addr_space_kb = (2 ** pc_constraint.pc_bits) // 1024
+            print(f"PC constraint: {pc_constraint.pc_bits} bits ({addr_space_kb}KB address space)")
+        if timing_constraint:
+            timing_parts = [f"{p}={v}" for p, v in timing_constraint.items()]
+            print(f"Timing constraints: {', '.join(timing_parts)}")
+
+        print(f"Generating v2 inline assumptions with explicit patterns...")
+        pc_bits = pc_constraint.pc_bits if pc_constraint else None
+        code = generate_inline_assumptions(
+            list(sigma_patterns), required_extensions, register_constraint, pc_bits,
+            config, instruction_rules, v2_mode=True)
+
+        with open(args.output_file, 'w') as f:
+            f.write(code)
+        print(f"Successfully wrote inline assumptions to {args.output_file}")
+
+        if timing_constraint:
+            print(f"Generating cache-aware timing constraints...")
+            timing_code = generate_timing_constraints(
+                instr_hit_latency=timing_constraint.get('instr_hit_latency', -1),
+                instr_miss_latency=timing_constraint.get('instr_miss_latency', -1),
+                data_hit_latency=timing_constraint.get('data_hit_latency', -1),
+                data_miss_latency=timing_constraint.get('data_miss_latency', -1),
+                locality_bits=timing_constraint.get('locality_bits', -1)
+            )
+            timing_output = args.output_file[:-3] + '_timing.sv' if args.output_file.endswith('.sv') else args.output_file + '_timing.sv'
+            with open(timing_output, 'w') as f:
+                f.write(timing_code)
+            print(f"Successfully wrote timing constraints to {timing_output}")
+
+        return  # Exit early for v2
+
+    # V1: Original outlawing semantics (rest of function unchanged)
+    print("Using v1 semantics (require + instruction outlawing)")
 
     # Separate rules into required extensions, register constraints, PC constraints, and outlawed patterns, timing constraints
     required_extensions = set()
@@ -896,6 +1583,16 @@ def main():
             pc_constraint = rule
         elif isinstance(rule, InstructionRule):
             instruction_rules.append(rule)  # Save for dtype processing
+
+            if rule.allow:
+                # TODO: Implement proper 'allow' semantics
+                # 'allow' rules define patterns that ARE allowed
+                # We need to generate patterns that forbid everything EXCEPT the allowed pattern
+                # For now, print a warning
+                print(f"Warning: 'allow' keyword at line {rule.line} is not fully implemented yet")
+                print(f"  The 'allow' rule will be treated as a regular outlawing rule")
+                print(f"  Full implementation requires generating complementary patterns")
+
             rule_patterns = instruction_rule_to_pattern(rule, has_c_ext)
             patterns.extend(rule_patterns)
         elif isinstance(rule, PatternRule):

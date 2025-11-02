@@ -36,6 +36,17 @@ I_TYPE_FIELDS = {
     "imm": (20, 12),
 }
 
+# I-type fields for shift instructions (SLLI, SRLI, SRAI)
+# Adds explicit 'shamt' field for the 5-bit shift amount
+I_TYPE_SHIFT_FIELDS = {
+    "opcode": (0, 7),
+    "rd": (7, 5),
+    "funct3": (12, 3),
+    "rs1": (15, 5),
+    "shamt": (20, 5),    # 5-bit shift amount (bits [24:20])
+    "imm": (20, 12),     # Full 12-bit immediate (for backward compatibility)
+}
+
 S_TYPE_FIELDS = {
     "opcode": (0, 7),
     "imm_0_4": (7, 5),
@@ -174,9 +185,9 @@ RV32I_INSTRUCTIONS = {
     "XORI":  InstructionEncoding("XORI",  0x00004013, 0x0000707F, "I", I_TYPE_FIELDS),
     "ORI":   InstructionEncoding("ORI",   0x00006013, 0x0000707F, "I", I_TYPE_FIELDS),
     "ANDI":  InstructionEncoding("ANDI",  0x00007013, 0x0000707F, "I", I_TYPE_FIELDS),
-    "SLLI":  InstructionEncoding("SLLI",  0x00001013, 0xFE00707F, "I", I_TYPE_FIELDS),
-    "SRLI":  InstructionEncoding("SRLI",  0x00005013, 0xFE00707F, "I", I_TYPE_FIELDS),
-    "SRAI":  InstructionEncoding("SRAI",  0x40005013, 0xFE00707F, "I", I_TYPE_FIELDS),
+    "SLLI":  InstructionEncoding("SLLI",  0x00001013, 0xFE00707F, "I", I_TYPE_SHIFT_FIELDS),
+    "SRLI":  InstructionEncoding("SRLI",  0x00005013, 0xFE00707F, "I", I_TYPE_SHIFT_FIELDS),
+    "SRAI":  InstructionEncoding("SRAI",  0x40005013, 0xFE00707F, "I", I_TYPE_SHIFT_FIELDS),
 
     # ALU Register-Register
     "ADD":   InstructionEncoding("ADD",   0x00000033, 0xFE00707F, "R", R_TYPE_FIELDS),
@@ -253,9 +264,9 @@ RV64I_INSTRUCTIONS = {
 
     # 64-bit ALU Immediate (operate on lower 32 bits)
     "ADDIW": InstructionEncoding("ADDIW", 0x0000001B, 0x0000707F, "I", I_TYPE_FIELDS),
-    "SLLIW": InstructionEncoding("SLLIW", 0x0000101B, 0xFE00707F, "I", I_TYPE_FIELDS),
-    "SRLIW": InstructionEncoding("SRLIW", 0x0000501B, 0xFE00707F, "I", I_TYPE_FIELDS),
-    "SRAIW": InstructionEncoding("SRAIW", 0x4000501B, 0xFE00707F, "I", I_TYPE_FIELDS),
+    "SLLIW": InstructionEncoding("SLLIW", 0x0000101B, 0xFE00707F, "I", I_TYPE_SHIFT_FIELDS),
+    "SRLIW": InstructionEncoding("SRLIW", 0x0000501B, 0xFE00707F, "I", I_TYPE_SHIFT_FIELDS),
+    "SRAIW": InstructionEncoding("SRAIW", 0x4000501B, 0xFE00707F, "I", I_TYPE_SHIFT_FIELDS),
 
     # 64-bit ALU Register-Register (operate on lower 32 bits)
     "ADDW":  InstructionEncoding("ADDW",  0x0000003B, 0xFE00707F, "R", R_TYPE_FIELDS),
