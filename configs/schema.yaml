@@ -33,11 +33,29 @@ properties:
       - instruction_data
       - pc
     properties:
+      clk:
+        type: string
+        description: "Clock signal name (optional, defaults to 'clk_i')"
+        default: "clk_i"
+        examples:
+          - "clk_i"  # Ibex
+          - "clk"    # Simple cores
+
+      rst_n:
+        type: string
+        description: "Active-low reset signal name (optional, defaults to 'rst_ni'). Use '1'b1' for combinational modules with no reset"
+        default: "rst_ni"
+        examples:
+          - "rst_ni"  # Ibex
+          - "rst_n"   # Simple cores
+          - "1'b1"    # Combinational modules (no reset)
+
       instruction_data:
         type: string
         description: "Signal name for the instruction word being decoded/executed"
         examples:
           - "instr_rdata_i"  # Ibex
+          - "instruction"    # Simple cores
           - "dec_uops_0_inst"  # BOOM
           - "ibuf_io_inst_0_bits_inst_bits"  # Rocket
 
@@ -46,6 +64,7 @@ properties:
         description: "Signal name for the program counter"
         examples:
           - "pc_if_o"  # Ibex
+          - "pc"       # Simple cores
           - "exe_pc_0"  # BOOM
           - "ibuf_io_pc"  # Rocket
 

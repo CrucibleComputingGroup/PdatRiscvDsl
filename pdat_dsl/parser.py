@@ -327,14 +327,14 @@ class RequireRule:
 
 @dataclass
 class IncludeRule:
-    """Include directive like 'include RV32I' or 'include SLLI {shamt = 5'b000xx}' (v2)"""
-    expr: Union[str, 'InstructionPattern']  # Extension name or instruction pattern
+    """Include directive like 'include RV32I' or 'include SLLI {shamt = 5'b000xx}' or 'include x0-x15' (v2)"""
+    expr: Union[str, 'InstructionPattern', 'RegisterRangeExpression']  # Extension name, instruction pattern, or register range
     line: int
 
 @dataclass
 class ForbidRule:
-    """Forbid directive like 'forbid MUL' or 'forbid SLLI {shamt = 5'b000xx}' (v2)"""
-    expr: Union[str, 'InstructionPattern']  # Extension name or instruction pattern
+    """Forbid directive like 'forbid MUL' or 'forbid SLLI {shamt = 5'b000xx}' or 'forbid x16-x31' (v2)"""
+    expr: Union[str, 'InstructionPattern', 'RegisterRangeExpression']  # Extension name, instruction pattern, or register range
     line: int
 
 @dataclass
@@ -342,6 +342,33 @@ class InstructionPattern:
     """Instruction pattern for v2: name + constraints (used in IncludeRule/ForbidRule)"""
     name: str
     constraints: List[FieldConstraint]
+
+@dataclass
+class RegisterRangeExpression:
+    """Register range expression for v2: x0-x15 as a first-class expression
+
+    Denotes the set of all instructions that use any register in the specified set.
+    Used with include/forbid: 'forbid x16-x31' removes all instructions using those registers.
+
+    Examples:
+        x0-x15    -> registers = {0, 1, 2, ..., 15}
+        x0, x2, x4 -> registers = {0, 2, 4}  (future: non-contiguous)
+        x0-x7, x16-x23 -> registers = {0,1,2,3,4,5,6,7,16,17,18,19,20,21,22,23}  (future)
+    """
+    registers: Set[int]  # Set of register numbers (0-31)
+
+    def is_contiguous(self) -> bool:
+        """Check if this is a contiguous range (for optimization in codegen)"""
+        if not self.registers:
+            return False
+        sorted_regs = sorted(self.registers)
+        return sorted_regs[-1] - sorted_regs[0] + 1 == len(sorted_regs)
+
+    def get_range(self) -> tuple[int, int]:
+        """Get min/max for contiguous ranges (for codegen optimization)"""
+        if not self.registers:
+            raise ValueError("Empty register set")
+        return (min(self.registers), max(self.registers))
 
 @dataclass
 class RegisterConstraintRule:
@@ -1094,7 +1121,7 @@ class Parser:
         return VersionDirective(version, version_tok.line)
 
     def parse_include_rule(self) -> IncludeRule:
-        """Parse: include EXTENSION or include INSTRUCTION [constraints] or include * {constraints}"""
+        """Parse: include EXTENSION or include INSTRUCTION [constraints] or include * {constraints} or include x0-x15"""
         include_tok = self.expect(TokenType.INCLUDE)
 
         # Check for wildcard
@@ -1109,8 +1136,12 @@ class Parser:
         else:
             name_tok = self.expect(TokenType.IDENTIFIER)
 
+            # Check if this is a register range (x0-x15)
+            if self.peek() and self.peek().type == TokenType.DASH:
+                # This is a register range expression
+                expr = self.parse_register_range_from_start(name_tok)
             # Check if there are constraints
-            if self.peek() and self.peek().type == TokenType.LBRACE:
+            elif self.peek() and self.peek().type == TokenType.LBRACE:
                 # This is an instruction pattern with constraints
                 constraints = self.parse_field_constraints()
                 expr = InstructionPattern(name_tok.value, constraints)
@@ -1121,7 +1152,7 @@ class Parser:
         return IncludeRule(expr, include_tok.line)
 
     def parse_forbid_rule(self) -> ForbidRule:
-        """Parse: forbid EXTENSION or forbid INSTRUCTION [constraints] or forbid * {constraints}"""
+        """Parse: forbid EXTENSION or forbid INSTRUCTION [constraints] or forbid * {constraints} or forbid x16-x31"""
         forbid_tok = self.expect(TokenType.FORBID)
 
         # Check for wildcard
@@ -1136,8 +1167,12 @@ class Parser:
         else:
             name_tok = self.expect(TokenType.IDENTIFIER)
 
+            # Check if this is a register range (x16-x31)
+            if self.peek() and self.peek().type == TokenType.DASH:
+                # This is a register range expression
+                expr = self.parse_register_range_from_start(name_tok)
             # Check if there are constraints
-            if self.peek() and self.peek().type == TokenType.LBRACE:
+            elif self.peek() and self.peek().type == TokenType.LBRACE:
                 # This is an instruction pattern with constraints
                 constraints = self.parse_field_constraints()
                 expr = InstructionPattern(name_tok.value, constraints)
@@ -1146,6 +1181,56 @@ class Parser:
                 expr = name_tok.value
 
         return ForbidRule(expr, forbid_tok.line)
+
+    def parse_register_range_from_start(self, start_tok: Token) -> RegisterRangeExpression:
+        """Parse register range starting from an already-consumed start token (e.g., x0-x15)
+
+        Args:
+            start_tok: Token containing the start register (e.g., "x0")
+
+        Returns:
+            RegisterRangeExpression with the set of registers in the range
+        """
+        # Parse start register
+        reg_str = start_tok.value.lower()
+        if not reg_str.startswith('x'):
+            self.error(f"Expected register name like 'x0', got {start_tok.value}")
+
+        try:
+            min_reg = int(reg_str[1:])
+        except ValueError:
+            self.error(f"Invalid register name: {start_tok.value}")
+
+        # Expect dash
+        self.expect(TokenType.DASH)
+
+        # Parse end register
+        end_tok = self.peek()
+        if end_tok.type != TokenType.IDENTIFIER:
+            self.error(f"Expected register name for end of range, got {end_tok.type}")
+
+        self.advance()
+        end_reg_str = end_tok.value.lower()
+        if not end_reg_str.startswith('x'):
+            self.error(f"Expected register name like 'x15', got {end_tok.value}")
+
+        try:
+            max_reg = int(end_reg_str[1:])
+        except ValueError:
+            self.error(f"Invalid register name: {end_tok.value}")
+
+        # Validate range
+        if min_reg < 0 or min_reg > 31:
+            self.error(f"Register number {min_reg} out of range (0-31)")
+        if max_reg < 0 or max_reg > 31:
+            self.error(f"Register number {max_reg} out of range (0-31)")
+        if min_reg > max_reg:
+            self.error(f"Invalid register range: x{min_reg}-x{max_reg} (min > max)")
+
+        # Create set of all registers in range
+        registers = set(range(min_reg, max_reg + 1))
+
+        return RegisterRangeExpression(registers)
 
 # ============================================================================
 # Main / Testing

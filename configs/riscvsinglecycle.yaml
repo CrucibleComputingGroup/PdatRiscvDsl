@@ -1,0 +1,26 @@
+# RiscvSingleCycle Core Configuration (for PdatRiscvDsl)
+# Single-cycle RISC-V implementation with RV32E (16 registers)
+
+core_name: "riscvsinglecycle"
+architecture: "rv32"
+
+# Where to inject inline assumptions (single injection point for DSL codegen)
+injection:
+  module_path: "RiscvSingleCycle_riscv_core.control_inst"
+  description: "Control unit - combinational instruction decoder"
+
+# Signal naming conventions
+signals:
+  # Clock/reset (control is combinational, so use dummy reset that's always true)
+  clk: "clk"
+  rst_n: "1'b1"  # Control has no reset - use constant true
+  
+  # Instruction signal in control module
+  instruction_data: "instruction"
+  
+  # PC signal
+  pc: "pc"
+
+# VCD analysis configuration
+vcd:
+  testbench_prefix: "tb_riscv.dut"

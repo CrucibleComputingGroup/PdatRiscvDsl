@@ -52,6 +52,14 @@ CORE_CONFIG_SCHEMA = {
             "type": "object",
             "required": ["instruction_data", "pc"],
             "properties": {
+                "clk": {
+                    "type": "string",
+                    "description": "Clock signal name (default: clk_i)"
+                },
+                "rst_n": {
+                    "type": "string",
+                    "description": "Active-low reset signal name (default: rst_ni). Use 1'b1 for no reset"
+                },
                 "instruction_data": {
                     "type": "string",
                     "description": "Signal name for instruction word"
@@ -227,6 +235,10 @@ class InjectionPoint:
 @dataclass
 class SignalConfig:
     """Signal name configuration for a specific core."""
+    # Clock and reset signals
+    clk: str = "clk_i"
+    rst_n: str = "rst_ni"  # Active-low reset
+
     # Instruction and PC signals
     instruction_data: str = "instr_rdata_i"
     pc: str = "pc_if_o"
@@ -240,10 +252,25 @@ class SignalConfig:
     multdiv_rs1: str = "multdiv_operand_a_ex_i"
     multdiv_rs2: str = "multdiv_operand_b_ex_i"
 
+    # Memory interface signals (for timing constraints)
+    # Instruction memory
+    instr_req: str = "instr_req_o"
+    instr_gnt: str = "instr_gnt_i"
+    # Data memory
+    data_req: str = "data_req_out"
+    data_gnt: str = "data_gnt_i"
+    data_rvalid: str = "data_rvalid_i"
+
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> 'SignalConfig':
         """Create SignalConfig from dictionary (loaded from YAML)."""
         signals = cls()
+
+        # Clock and reset signals
+        if 'clk' in d:
+            signals.clk = d['clk']
+        if 'rst_n' in d:
+            signals.rst_n = d['rst_n']
 
         if 'instruction_data' in d:
             signals.instruction_data = d['instruction_data']
@@ -265,6 +292,20 @@ class SignalConfig:
                     signals.multdiv_rs1 = operands['multdiv']['rs1']
                 if 'rs2' in operands['multdiv']:
                     signals.multdiv_rs2 = operands['multdiv']['rs2']
+
+        # Handle memory interface signals (optional - for timing constraints)
+        if 'memory' in d:
+            mem = d['memory']
+            if 'instr_req' in mem:
+                signals.instr_req = mem['instr_req']
+            if 'instr_gnt' in mem:
+                signals.instr_gnt = mem['instr_gnt']
+            if 'data_req' in mem:
+                signals.data_req = mem['data_req']
+            if 'data_gnt' in mem:
+                signals.data_gnt = mem['data_gnt']
+            if 'data_rvalid' in mem:
+                signals.data_rvalid = mem['data_rvalid']
 
         return signals
 

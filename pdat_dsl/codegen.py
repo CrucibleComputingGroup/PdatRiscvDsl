@@ -15,7 +15,7 @@ import sys
 import argparse
 from typing import List, Tuple, Set, Optional
 from pathlib import Path
-from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule, PcConstraintRule, DataTypeSet, BitPattern, TimingConstraintRule, IncludeRule, ForbidRule, InstructionPattern, RangeValue
+from .parser import parse_dsl, InstructionRule, PatternRule, FieldConstraint, RequireRule, RegisterConstraintRule, PcConstraintRule, DataTypeSet, BitPattern, TimingConstraintRule, IncludeRule, ForbidRule, InstructionPattern, RangeValue, RegisterRangeExpression
 from .encodings import (
     get_instruction_encoding, parse_register, set_field, create_field_mask,
     get_extension_instructions
@@ -311,6 +311,93 @@ def expand_instruction_pattern_v2(pattern: InstructionPattern) -> Set[Tuple[int,
     return {(base_pattern, base_mask, desc, encoding.is_compressed)}
 
 
+def expand_register_range_to_bdd(reg_range: RegisterRangeExpression, width: int = 32):
+    """
+    Expand a register range to a BDD matching all instructions using those registers.
+
+    For register range x16-x31, this matches ANY instruction where:
+    - rd ∈ {16...31} OR rs1 ∈ {16...31} OR rs2 ∈ {16...31}
+
+    Args:
+        reg_range: RegisterRangeExpression containing set of register numbers
+        width: Instruction width (32 or 16)
+
+    Returns:
+        BDD representing all instructions using registers in the range
+    """
+    from .encodings import ALL_INSTRUCTIONS
+    bdd_mgr = get_bdd_manager(width)
+    result = bdd_mgr.false  # Start with empty set
+
+    # Iterate over all instruction encodings
+    for instr_name, encoding in ALL_INSTRUCTIONS.items():
+        instr_width = 16 if encoding.is_compressed else 32
+        if instr_width != width:
+            continue  # Skip instructions of different width
+
+        # Get the base pattern for this instruction
+        instr_bdd = pattern_to_bdd(encoding.base_pattern, encoding.base_mask, width)
+
+        # Check which register fields this instruction has
+        reg_fields_bdd = bdd_mgr.false  # OR together constraints for each register field
+
+        for field_name in ['rd', 'rs1', 'rs2']:
+            if field_name in encoding.fields:
+                field_pos, field_width = encoding.fields[field_name]
+                # Create BDD for "field ∈ reg_range.registers"
+                field_in_range_bdd = bdd_mgr.false
+                for reg_num in reg_range.registers:
+                    # Check if field == reg_num
+                    field_equals_bdd = field_equals_to_bdd(field_pos, field_width, reg_num, width)
+                    field_in_range_bdd |= field_equals_bdd
+
+                # OR this field's constraint with others
+                reg_fields_bdd |= field_in_range_bdd
+
+        # This instruction matches if it uses any register in the range
+        instr_matches_bdd = instr_bdd & reg_fields_bdd
+        result |= instr_matches_bdd
+
+    return result
+
+
+def expand_register_range_to_patterns(reg_range: RegisterRangeExpression) -> Set[Tuple[int, int, str, bool]]:
+    """
+    Expand a register range to explicit patterns (non-BDD version).
+
+    For register range x16-x31, generates patterns for all instruction x register combinations.
+
+    Args:
+        reg_range: RegisterRangeExpression containing set of register numbers
+
+    Returns:
+        Set of (pattern, mask, description, is_compressed) tuples
+    """
+    from .encodings import ALL_INSTRUCTIONS
+    result = set()
+
+    # Iterate over all instruction encodings
+    for instr_name, encoding in ALL_INSTRUCTIONS.items():
+        # Check which register fields this instruction has
+        register_fields = [(name, pos, width) for name in ['rd', 'rs1', 'rs2']
+                          if name in encoding.fields
+                          for pos, width in [encoding.fields[name]]]
+
+        if not register_fields:
+            continue  # This instruction has no register fields
+
+        # For each register in the range, generate a pattern
+        for reg_num in reg_range.registers:
+            for field_name, field_pos, field_width in register_fields:
+                # Create pattern with this field set to reg_num
+                pattern = encoding.base_pattern | (reg_num << field_pos)
+                mask = encoding.base_mask | ((1 << field_width) - 1) << field_pos
+                desc = f"{instr_name} {{{field_name}=x{reg_num}}}"
+                result.add((pattern, mask, desc, encoding.is_compressed))
+
+    return result
+
+
 def expand_expr_v2_bdd(expr, has_c_ext: bool = False, width: int = 32):
     """
     Expand a v2 expression to a BDD representing the instruction language.
@@ -356,6 +443,9 @@ def expand_expr_v2_bdd(expr, has_c_ext: bool = False, width: int = 32):
     elif isinstance(expr, InstructionPattern):
         # Instruction with constraints - use BDD expansion
         return expand_instruction_pattern_v2_bdd(expr, use_bdd=True)
+    elif isinstance(expr, RegisterRangeExpression):
+        # Register range expression - matches all instructions using registers in the range
+        return expand_register_range_to_bdd(expr, width)
     else:
         print(f"Warning: Invalid expression type: {type(expr)}")
         return bdd_mgr.false
@@ -395,6 +485,9 @@ def expand_expr_v2(expr, has_c_ext: bool = False) -> Set[Tuple[int, int, str, bo
     elif isinstance(expr, InstructionPattern):
         # Instruction with constraints
         return expand_instruction_pattern_v2(expr)
+    elif isinstance(expr, RegisterRangeExpression):
+        # Register range expression - matches all instructions using registers in the range
+        return expand_register_range_to_patterns(expr)
     else:
         print(f"Warning: Invalid expression type: {type(expr)}")
         return set()
@@ -717,7 +810,7 @@ def generate_dtype_assertions(rules: List[InstructionRule], config: Optional[Cor
                 code += f"  // Gated by reset to allow ABC scorr (init state must satisfy constraints)\n"
                 code += f"  always_comb begin\n"
                 code += f"    if ({instr_match}) begin\n"
-                code += f"      assume (!rst_ni || ({condition}));\n"
+                code += f"      assume (!{config.signals.rst_n} || ({condition}));\n"
                 code += f"    end\n"
                 code += f"  end\n\n"
 
@@ -828,11 +921,14 @@ def generate_module_dtype_assertions(rules: List[InstructionRule],
                     condition = f"!{check_expr}"
                     semantic = "forbid"
 
+                # Get rst_n signal from module config or use default
+                rst_n = module_config.signals.rst_n if module_config.signals else "rst_ni"
+
                 code += f"  // {rule.name} {operand_name}: {semantic} {dtype_set}\n"
                 code += f"  // Gated by reset - operands are PRIMARY INPUTS (no init state issue)\n"
                 code += f"  always_comb begin\n"
                 code += f"    if ({instr_match}) begin\n"
-                code += f"      assume (!rst_ni || ({condition}));\n"
+                code += f"      assume (!{rst_n} || ({condition}));\n"
                 code += f"    end\n"
                 code += f"  end\n\n"
 
@@ -841,7 +937,8 @@ def generate_module_dtype_assertions(rules: List[InstructionRule],
 
 def generate_timing_constraints(instr_hit_latency, instr_miss_latency,
                                 data_hit_latency, data_miss_latency,
-                                locality_bits) -> str:
+                                locality_bits,
+                                config: Optional[CoreConfig] = None) -> str:
     """
     Generate SystemVerilog timing constraints for cache-aware optimization.
 
@@ -851,10 +948,22 @@ def generate_timing_constraints(instr_hit_latency, instr_miss_latency,
         data_hit_latency: Max cycles for data cache hit (-1 to disable)
         data_miss_latency: Max cycles for data cache miss (-1 to disable)
         locality_bits: Number of address high bits for locality detection (unused)
+        config: Core configuration (defaults to Ibex if not provided)
 
     Returns:
         SystemVerilog code with timing constraints
     """
+    if config is None:
+        config = CoreConfig.default_ibex()
+
+    # Extract signal names from config
+    clk = config.signals.clk
+    rst_n = config.signals.rst_n
+    instr_req = config.signals.instr_req
+    instr_gnt = config.signals.instr_gnt
+    data_req = config.signals.data_req
+    data_gnt = config.signals.data_gnt
+    data_rvalid = config.signals.data_rvalid
     # Check if we have any timing constraints to generate
     has_instr_constraints = instr_hit_latency != -1 or instr_miss_latency != -1
     has_data_constraints = data_hit_latency != -1 or data_miss_latency != -1
@@ -877,12 +986,12 @@ def generate_timing_constraints(instr_hit_latency, instr_miss_latency,
   logic [2:0] instr_stall_counter_q;
   logic instr_likely_miss;
 
-  always_ff @(posedge clk_i or negedge rst_ni) begin
-    if (!rst_ni) begin
+  always_ff @(posedge {clk} or negedge {rst_n}) begin
+    if (!{rst_n}) begin
       instr_stall_counter_q <= 3'b0;
       instr_likely_miss <= 1'b0;
     end else begin
-      if (instr_req_o && !instr_gnt_i) begin
+      if ({instr_req} && !{instr_gnt}) begin
         instr_stall_counter_q <= instr_stall_counter_q + 1;
         // After 1 cycle of stalling, assume cache miss
         instr_likely_miss <= (instr_stall_counter_q >= 1);
@@ -902,15 +1011,15 @@ def generate_timing_constraints(instr_hit_latency, instr_miss_latency,
   logic [2:0] data_stall_counter_q;
   logic data_likely_miss;
 
-  always_ff @(posedge clk_i or negedge rst_ni) begin
-    if (!rst_ni) begin
+  always_ff @(posedge {clk} or negedge {rst_n}) begin
+    if (!{rst_n}) begin
       data_stall_counter_q <= 3'b0;
       data_likely_miss <= 1'b0;
     end else begin
-      if (data_req_out && !data_gnt_i) begin
+      if ({data_req} && !{data_gnt}) begin
         data_stall_counter_q <= data_stall_counter_q + 1;
         data_likely_miss <= (data_stall_counter_q >= 1);
-      end else if (data_rvalid_i) begin
+      end else if ({data_rvalid}) begin
         data_stall_counter_q <= 3'b0;
         data_likely_miss <= 1'b0;
       end
@@ -920,10 +1029,10 @@ def generate_timing_constraints(instr_hit_latency, instr_miss_latency,
 """
 
     # Generate timing assumptions
-    code += """
+    code += f"""
   // Cache-aware timing assumptions
   always_comb begin
-    if (rst_ni) begin"""
+    if ({rst_n}) begin"""
 
     if has_instr_constraints:
         code += """
@@ -951,7 +1060,7 @@ def generate_timing_constraints(instr_hit_latency, instr_miss_latency,
 
       // Force completion at maximum latency
       if (instr_stall_counter_q == 3'd{instr_miss_latency}) begin
-        assume(instr_gnt_i);  // Must grant at max stall
+        assume({instr_gnt});  // Must grant at max stall
       end"""
 
     if has_data_constraints:
@@ -980,7 +1089,7 @@ def generate_timing_constraints(instr_hit_latency, instr_miss_latency,
 
       // Force completion at maximum latency
       if (data_stall_counter_q == 3'd{data_miss_latency}) begin
-        assume(data_gnt_i);  // Must grant at max stall
+        assume({data_gnt});  // Must grant at max stall
       end"""
 
     code += """
@@ -1011,6 +1120,7 @@ def generate_inline_assumptions_bdd(sigma_bdd, register_constraint=None, pc_bits
     from .bdd_ops import bdd_to_systemverilog_function
 
     instr_data = config.signals.instruction_data
+    rst_n = config.signals.rst_n
     has_compressed_check = config.signals.has_compressed_check
 
     code = "\n  // ========================================\n"
@@ -1026,7 +1136,7 @@ def generate_inline_assumptions_bdd(sigma_bdd, register_constraint=None, pc_bits
         addr_space_kb = (2 ** pc_bits) // 1024
         code += f"  // PC address space constraint: {pc_bits}-bit address space ({addr_space_kb}KB)\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || {config.signals.pc}[31:{pc_bits}] == {32-pc_bits}'b0);\n"
+        code += f"    assume (!{rst_n} || {config.signals.pc}[31:{pc_bits}] == {32-pc_bits}'b0);\n"
         code += "  end\n\n"
 
     # Generate function from BDD
@@ -1039,12 +1149,85 @@ def generate_inline_assumptions_bdd(sigma_bdd, register_constraint=None, pc_bits
     code += "  // Instruction must match allowed set\n"
     code += "  always_comb begin\n"
     if has_compressed_check:
-        code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || matches_allowed_instruction({instr_data}));\n"
+        code += f"    assume (!{rst_n} || ({instr_data}[1:0] != 2'b11) || matches_allowed_instruction({instr_data}));\n"
     else:
-        code += f"    assume (!rst_ni || matches_allowed_instruction({instr_data}));\n"
+        code += f"    assume (!{rst_n} || matches_allowed_instruction({instr_data}));\n"
     code += "  end\n\n"
 
     # TODO: Add register constraints if specified
+
+    return code
+
+
+def generate_inline_assumptions_from_aig_db(db, config: Optional[CoreConfig] = None, pc_bits: Optional[int] = None):
+    """
+    Generate inline SystemVerilog assumptions from AIG-based instruction database.
+
+    Args:
+        db: InstructionDatabase with per-instruction AIG constraints
+        config: Core configuration (defaults to Ibex if not provided)
+        pc_bits: Number of PC address bits (optional)
+
+    Returns:
+        SystemVerilog code string with inline assumptions
+    """
+    from .codegen_v2_aig import InstructionDatabase
+    from .config import CoreConfig
+
+    if config is None:
+        config = CoreConfig.default_ibex()
+
+    instr_data = config.signals.instruction_data
+    rst_n = config.signals.rst_n
+
+    code = ""
+    code += "\n"
+    code += "  // ========================================\n"
+    code += "  // Auto-generated instruction constraints\n"
+    code += f"  // Target core: {config.core_name} ({config.architecture})\n"
+    code += f"  // Inject into: {config.injection.module_path}\n"
+    code += f"  // Location: {config.injection.description}\n"
+    code += "  // ========================================\n\n"
+
+    code += f"  // V2: AIG-based per-instruction field constraints\n"
+    code += f"  // Allowed instruction set: {len(db.constraints)} instructions\n\n"
+
+    # Extract register fields as wires for cleaner syntax
+    code += "  // Extract register fields\n"
+    code += f"  wire [4:0] instr_rd = {instr_data}[11:7];\n"
+    code += f"  wire [4:0] instr_rs1 = {instr_data}[19:15];\n"
+    code += f"  wire [4:0] instr_rs2 = {instr_data}[24:20];\n\n"
+
+    # Generate OR of all instruction constraints
+    code += "  always_comb begin\n"
+    code += f"    assume (!{rst_n} || ({instr_data}[1:0] != 2'b11) || (\n"
+
+    constraint_exprs = []
+    for instr_name, constraint in sorted(db.constraints.items()):
+        # Use extracted field wires (pass instruction signal name from config)
+        sv_expr = constraint.to_systemverilog_with_wires(instr_data)
+        constraint_exprs.append((sv_expr, instr_name))
+
+    # Generate OR of all constraints with proper formatting
+    # Format: (expr)  // name
+    #      || (expr)  // name
+    for i, (sv_expr, instr_name) in enumerate(constraint_exprs):
+        if i == 0:
+            code += f"      ({sv_expr})  // {instr_name}\n"
+        else:
+            code += f"      || ({sv_expr})  // {instr_name}\n"
+    code += "    ));\n"
+    code += "  end\n"
+
+    # PC constraint if specified
+    if pc_bits:
+        code += "\n"
+        code += f"  // PC address space constraint: {pc_bits} bits\n"
+        pc_signal = config.signals.pc
+        unused_bits = 32 - pc_bits
+        code += "  always_comb begin\n"
+        code += f"    assume (!{rst_n} || ({pc_signal}[31:{pc_bits}] == {unused_bits}'b0));\n"
+        code += "  end\n"
 
     return code
 
@@ -1071,6 +1254,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
 
     data_width = config.data_width
     instr_data = config.signals.instruction_data
+    rst_n = config.signals.rst_n
     has_compressed_check = config.signals.has_compressed_check
 
     code = "\n  // ========================================\n"
@@ -1086,7 +1270,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         code += f"  // PC address space constraint: {pc_bits}-bit address space ({addr_space_kb}KB)\n"
         code += f"  // Unconditional assumption for ABC optimization\n"
         code += "  always_comb begin\n"
-        code += f"    assume (!rst_ni || {config.signals.pc}[{data_width-1}:{pc_bits}] == {data_width-pc_bits}'b0);\n"
+        code += f"    assume (!{rst_n} || {config.signals.pc}[{data_width-1}:{pc_bits}] == {data_width-pc_bits}'b0);\n"
         code += "  end\n\n"
 
     # Note: No compression bit consistency check needed
@@ -1220,9 +1404,9 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
             code += "  // 32-bit instructions: allow ONLY these patterns\n"
             code += "  always_comb begin\n"
             if has_compressed_check:
-                code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || (\n"
+                code += f"    assume (!{rst_n} || ({instr_data}[1:0] != 2'b11) || (\n"
             else:
-                code += f"    assume (!rst_ni || (\n"
+                code += f"    assume (!{rst_n} || (\n"
 
             # Generate OR of all allowed patterns
             for i, (pattern, mask, desc) in enumerate(patterns_32bit):
@@ -1240,7 +1424,7 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
         if patterns_16bit:
             code += "  // 16-bit compressed instructions: allow ONLY these patterns\n"
             code += "  always_comb begin\n"
-            code += f"    assume (!rst_ni || ({instr_data}[1:0] == 2'b11) || (\n"
+            code += f"    assume (!{rst_n} || ({instr_data}[1:0] == 2'b11) || (\n"
 
             for i, (pattern, mask, desc) in enumerate(patterns_16bit):
                 is_last = (i == len(patterns_16bit) - 1)
@@ -1287,9 +1471,9 @@ def generate_inline_assumptions(patterns, required_extensions: Set[str] = None,
             code += "  // Instruction must match one of these valid patterns (OR of all valid instructions)\n"
             code += "  always_comb begin\n"
             if has_compressed_check:
-                code += f"    assume (!rst_ni || ({instr_data}[1:0] != 2'b11) || (\n"
+                code += f"    assume (!{rst_n} || ({instr_data}[1:0] != 2'b11) || (\n"
             else:
-                code += f"    assume (!rst_ni || (\n"
+                code += f"    assume (!{rst_n} || (\n"
 
             # Generate OR of all valid instruction patterns
             for i, (pattern, mask, desc) in enumerate(valid_patterns):
@@ -1405,7 +1589,7 @@ def process_v2_rules_bdd(rules: List, has_c_ext: bool = False, use_bdd: bool = T
 
 
 def process_v2_rules(rules: List, has_c_ext: bool = False) -> Set[Tuple[int, int, str, bool]]:
-    """
+    r"""
     Process v2 rules sequentially using set operations.
 
     V2 Semantics:
@@ -1509,12 +1693,12 @@ def main():
                     timing_constraint = {}
                 timing_constraint[rule.param_name] = rule.value
 
-        # Process v2 rules sequentially (using set-based approach for explicit patterns)
-        # BDD mode generates compact functions but loses pattern visibility for debugging
-        # Use set-based approach to generate explicit pattern matching with detailed comments
-        sigma_patterns = process_v2_rules_bdd(ast.rules, has_c_ext, use_bdd=False)
+        # Process v2 rules using AIG-based per-instruction constraints
+        from .codegen_v2_aig import process_v2_rules_aig
 
-        print(f"Final instruction set: {len(sigma_patterns)} patterns")
+        sigma_db = process_v2_rules_aig(ast.rules, has_c_ext)
+
+        print(f"Final instruction set: {len(sigma_db.constraints)} instructions with field constraints")
 
         required_extensions = set()  # Not used in v2, but keep for compatibility
         if register_constraint:
@@ -1526,11 +1710,10 @@ def main():
             timing_parts = [f"{p}={v}" for p, v in timing_constraint.items()]
             print(f"Timing constraints: {', '.join(timing_parts)}")
 
-        print(f"Generating v2 inline assumptions with explicit patterns...")
+        print(f"Generating v2 inline assumptions from AIG constraints...")
         pc_bits = pc_constraint.pc_bits if pc_constraint else None
-        code = generate_inline_assumptions(
-            list(sigma_patterns), required_extensions, register_constraint, pc_bits,
-            config, instruction_rules, v2_mode=True)
+        code = generate_inline_assumptions_from_aig_db(
+            sigma_db, config, pc_bits)
 
         with open(args.output_file, 'w') as f:
             f.write(code)
@@ -1543,7 +1726,8 @@ def main():
                 instr_miss_latency=timing_constraint.get('instr_miss_latency', -1),
                 data_hit_latency=timing_constraint.get('data_hit_latency', -1),
                 data_miss_latency=timing_constraint.get('data_miss_latency', -1),
-                locality_bits=timing_constraint.get('locality_bits', -1)
+                locality_bits=timing_constraint.get('locality_bits', -1),
+                config=config
             )
             timing_output = args.output_file[:-3] + '_timing.sv' if args.output_file.endswith('.sv') else args.output_file + '_timing.sv'
             with open(timing_output, 'w') as f:
@@ -1635,7 +1819,8 @@ def main():
             instr_miss_latency=timing_constraint.get('instr_miss_latency', -1),
             data_hit_latency=timing_constraint.get('data_hit_latency', -1),
             data_miss_latency=timing_constraint.get('data_miss_latency', -1),
-            locality_bits=timing_constraint.get('locality_bits', -1)
+            locality_bits=timing_constraint.get('locality_bits', -1),
+            config=config
         )
 
         # Determine timing output file
