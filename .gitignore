@@ -57,3 +57,6 @@ Thumbs.db
 *.smt2
 output/
 CLAUDE.md
+
+slpp_all
+abc.history
