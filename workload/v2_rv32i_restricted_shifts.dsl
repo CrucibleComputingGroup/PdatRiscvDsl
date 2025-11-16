@@ -42,7 +42,3 @@ include SRAI {shamt = 5'b00111}
 # Result: Full RV32I with all shift instructions limited to 3-bit shift amounts (0-7)
 # Upper 2 bits of shift amount are constrained to 00
 
-instr_hit_latency 1
-instr_miss_latency 5
-data_hit_latency 1
-data_miss_latency 4
