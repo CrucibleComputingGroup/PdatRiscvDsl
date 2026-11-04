@@ -34,9 +34,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+contracts = ["z3-solver>=4.12"]
 dev = [
     "pytest>=7.0",
     "pytest-cov",
+    "z3-solver>=4.12",
     "black",
     "mypy",
 ]

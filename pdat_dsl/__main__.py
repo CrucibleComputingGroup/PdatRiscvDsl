@@ -12,6 +12,11 @@ from pathlib import Path
 
 def main():
     """Main CLI entry point."""
+    if len(sys.argv) > 1 and sys.argv[1] == "contract":
+        if sys.version_info < (3, 8):
+            raise SystemExit("CRISP 3 contracts require Python 3.8 or newer")
+        from .contracts import main as contract_main
+        return contract_main(sys.argv[2:])
     parser = argparse.ArgumentParser(
         prog="pdat-dsl",
         description="PDAT DSL - RISC-V ISA subset specification language",
@@ -35,6 +40,7 @@ For more information, visit: https://github.com/yourusername/PdatDsl
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
+    subparsers.add_parser("contract", help="Check/compile typed CRISP 3 contracts (contract --help)")
 
     # Parse command
     parse_parser = subparsers.add_parser(

@@ -1,0 +1,23 @@
+crisp 3
+# Illustrative bindings. Integration must also observe the actual interface's
+# stall, ready, and backpressure behavior before proving a whole-unit cut.
+import "refinements.crisp"
+clock core = clk_i reset rst_ni active_low
+event issue on core scope execute when accepted
+event completion on core scope execute when done
+signal accepted : bool @ issue = accepted_i
+signal instr : bits[32] @ issue = instr_i
+signal lhs : bits[32] @ issue = operand_a_i
+signal rhs : bits[32] @ issue = operand_b_i
+signal quotient : bits[32] @ issue = quotient_q
+signal done : bool @ completion = result_valid_o
+signal result : bits[32] @ completion = result_o
+
+policy supported at issue on instr
+include REM
+include REMU
+end
+assume operand_domain at issue: narrow(lhs, 16) and narrow(rhs, 16)
+observe remainder at completion: result
+# A proposal only: the artifact requires proof over both circuits and all cycles.
+candidate quotient_cut at issue: quotient -> bv(0, 32)

@@ -1,0 +1,14 @@
+crisp 3
+import "refinements.crisp"
+clock core = clk_i reset rst_ni active_low
+# Execution includes speculative attempts. The binding must NOT add ready/retire.
+event loads on core scope execute when load_attempt
+event stores on core scope execute when store_attempt
+signal load_attempt : bool @ loads = load_exec_i
+signal load_address : bits[32] @ loads = load_paddr_i
+signal store_attempt : bool @ stores = store_exec_i
+signal store_address : bits[32] @ stores = store_paddr_i
+assume load_partition at loads: input_region(load_address)
+assume store_partition at stores: output_region(store_address)
+# This encodes the declared execution-level domain; it does not prove a program
+# satisfies it, validate these example bindings against RSD, or authorize a cut.

@@ -1,0 +1,12 @@
+crisp 3
+clock core = clk_i reset rst_ni active_low
+event decode on core scope decode when valid
+signal valid : bool @ decode = instr_valid_i
+signal instr : bits[32] @ decode = instr_i
+policy subset at decode on instr
+include RV32I
+forbid ADD
+include ADD {rd = x0}
+forbid ADDI
+include ADDI {imm in 3-11}
+end

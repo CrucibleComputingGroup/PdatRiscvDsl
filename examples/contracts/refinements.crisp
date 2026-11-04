@@ -1,0 +1,7 @@
+library crisp 3
+# Predicate libraries cannot inject assumptions, read global signals, or run code.
+predicate narrow(x: bits[W], n: nat) = fits_s(x, n) or fits_u(x, n)
+predicate aligned(x: bits[W], n: nat) = slice(x, n-1, 0) == 0
+predicate same_region(a: bits[W], b: bits[W]) = slice(a, 21, 16) == slice(b, 21, 16)
+predicate input_region(a: bits[W]) = slice(a, 21, 16) == 0
+predicate output_region(a: bits[W]) = not input_region(a)

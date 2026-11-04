@@ -1,0 +1,8 @@
+crisp 3
+clock core = clk_i reset rst_ni active_low
+event bus on core scope interface when True
+signal request : bool @ bus = request_i
+signal response : bool @ bus = response_i
+# Every sampled request has some response 1..4 clock edges later.
+# This is not transaction matching or a complete valid/ready protocol.
+assume response bounded_memory at bus: request -> response within 1..4
