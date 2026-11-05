@@ -1,0 +1,29 @@
+{
+  "baseline_artifact": "/tmp/crisp-legacy-sva-baseline-20261105/baseline/21/assumptions_timing.sv",
+  "wrapper": "/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv",
+  "command": [
+    "iverilog",
+    "-g2012",
+    "-s",
+    "timing_check",
+    "-o",
+    "/tmp/crisp-legacy-timing-diagnostic-20261105/check.vvp",
+    "/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv"
+  ],
+  "returncode": 1,
+  "configured_bindings": {
+    "clk": "clk_i",
+    "rst_n": "rst_ni",
+    "instr_req": "instr_req_o",
+    "instr_gnt": "instr_gnt_i",
+    "data_req": "data_req_out",
+    "data_gnt": "data_gnt_i",
+    "data_rvalid": "data_rvalid_i"
+  },
+  "log": "/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv:14: error: Unable to bind wire/reg/memory `rst_n' in `timing_check'\n/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv:14: error: Concatenation/replication may not have zero width in this context.\n/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv:14: error: Unable to elaborate condition expression.\n/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv:35: error: Unable to bind wire/reg/memory `rst_n' in `timing_check'\n/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv:35: error: Concatenation/replication may not have zero width in this context.\n/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv:35: error: Unable to elaborate condition expression.\nElaboration failed\n",
+  "baseline_commit": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+  "input": "PdatDsl/Motivation/pdat.dsl",
+  "configuration": "default",
+  "wrapper_sha256": "27bfc6e21b927251175b217562d138d21b572ff9c42eb6a077ebb54ef8cf19a3",
+  "limitation": "Generation success and byte parity do not establish compilable HDL or correct RTL bindings."
+}

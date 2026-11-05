@@ -1,0 +1,1092 @@
+{
+  "baseline_commit": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+  "current_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+  "python": "3.13.2 | packaged by conda-forge | (main, Feb 17 2025, 14:10:22) [GCC 13.3.0]",
+  "hash_seed": "29",
+  "inputs": {
+    "PdatDsl/Motivation/aesip_1.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/Motivation/aesip_1.dsl",
+      "tracked": true,
+      "sha256": "055d8413933076517c2de38281ecd2bc69a6dfa5218a4b36d1f213fedf6fff11",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/Motivation/aesip_2.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/Motivation/aesip_2.dsl",
+      "tracked": true,
+      "sha256": "644cc7e64d6eb954f90129dc5d1144324f24d09a39569f0afcc0d89322264893",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/Motivation/baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/Motivation/baseline.dsl",
+      "tracked": true,
+      "sha256": "7367671fdccc2cf55746ef56a9f5888a932e97e941f7a5586549b3cf746b4994",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/Motivation/pdat.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/Motivation/pdat.dsl",
+      "tracked": true,
+      "sha256": "9a6649a6959bc492aa722ddbaacdfd7e672d58b022b1adb77a65887ddd0475df",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/Motivation/v2_rv32i_restricted_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/Motivation/v2_rv32i_restricted_shifts.dsl",
+      "tracked": true,
+      "sha256": "7b5a22df5f3d899f4b4522ae0e1256ca21a7374ded354ad09d98c33f8324e7ca",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/allow_shifts_example.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/allow_shifts_example.dsl",
+      "tracked": true,
+      "sha256": "0413a3429ca4dbd1a2342bbdfcc0d62adc3e17eeb3ef89010b4fdfa83b16d6e0",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/bitpattern_addi_powers_of_two.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/bitpattern_addi_powers_of_two.dsl",
+      "tracked": true,
+      "sha256": "fb4a2be0e6a90d6979e7e27392a9de8aa075142ddc859742b279428eed668a6b",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/data_type_constraints.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/data_type_constraints.dsl",
+      "tracked": true,
+      "sha256": "273b4b8c42d6a76a72fcce2a0047b0383149908051bf123c7fb5ea38b3165a42",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/example_16reg.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/example_16reg.dsl",
+      "tracked": true,
+      "sha256": "34d9658a2e233962b18cf99d7a1b1f58ee59e2a3cdeec23863d424fdfac2e3ea",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/example_outlawed.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/example_outlawed.dsl",
+      "tracked": true,
+      "sha256": "eac2ee0c113017d1b60440bd1661d796e797498fb8185a4a2c9a130be0041c13",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/none_outlawed.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/none_outlawed.dsl",
+      "tracked": true,
+      "sha256": "7367671fdccc2cf55746ef56a9f5888a932e97e941f7a5586549b3cf746b4994",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/restrict_branch_alignment.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/restrict_branch_alignment.dsl",
+      "tracked": true,
+      "sha256": "d67f0dc9a77fbdbf0cd8d582a3d1a365d19adba1d43b3a1c19850369551f79f9",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/restrict_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/restrict_shifts.dsl",
+      "tracked": true,
+      "sha256": "3ffbfe82d5bd6a67c8492837273fba895b4d908ea91b589aef746ee249313f6a",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/restrict_single_shift.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/restrict_single_shift.dsl",
+      "tracked": true,
+      "sha256": "723b022bac90c8577154235d5c2e7f18c3acbf12ed3f4efaf668b3400e4fedd0",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/rv32i.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32i.dsl",
+      "tracked": false,
+      "sha256": "6d5cd181d9efda74d2d3588d63afc3798c16a4f05c3038a6e58744e86957fd02",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/rv32i_timing.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32i_timing.dsl",
+      "tracked": false,
+      "sha256": "b9f990f3ee4ab525516cab502974d8efff6143e8629760fd62bdf380e7c7b425",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/rv32ic.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32ic.dsl",
+      "tracked": true,
+      "sha256": "17ff78615399f6bc9396f14bc715d5e7efbdfcce8ce13ea9c6e551a1645ecb51",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/rv32im.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im.dsl",
+      "tracked": true,
+      "sha256": "4c42b042e5c26a12ec75da6bccac2fd9b04a896df7add22bddd1b06c08d92b61",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/rv32im_64kb.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_64kb.dsl",
+      "tracked": true,
+      "sha256": "bc8dc0f2f19a17589ff80d0b71337158cc9aa47feb24a9f8603412aa91606e46",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/rv32im_narrow16.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_narrow16.dsl",
+      "tracked": true,
+      "sha256": "9f0e97ef10f502368f0d948764f54591ec1fff39866f2ab21270e54b2b188238",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/rv32im_narrow8.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_narrow8.dsl",
+      "tracked": true,
+      "sha256": "c0eeaccf5218e0a8d35bf070dd9d54e73f5c8b1e47cca3a7761130b123045686",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/rv32im_no_mul.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_no_mul.dsl",
+      "tracked": false,
+      "sha256": "ce5930d6e33079b48e9e7bd6fcb106741791cee84faa74b079f5247d1f29a521",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/rv32im_no_mul_timing.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_no_mul_timing.dsl",
+      "tracked": false,
+      "sha256": "d12b2d99764642ab7f153aa9c9f8728640823aed8950ab3f2d6551540d7b4752",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/rv32im_timing.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_timing.dsl",
+      "tracked": true,
+      "sha256": "30e8569f7682f633e24790899bd54d24c05d11c55e5b0feb3e9d4fe8e3ef0639",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/rv32im_timing_strict.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_timing_strict.dsl",
+      "tracked": true,
+      "sha256": "7833bb30762902b16ecafdcd041f76fa118bb775cfa084d56d678694d7dee948",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/v2_allow_slli_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_allow_slli_shifts.dsl",
+      "tracked": true,
+      "sha256": "bd93541c22443ef37889685d9393d81a31f111d89a82bed4d1377e4e8a460f27",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/v2_minimal_isa.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_minimal_isa.dsl",
+      "tracked": true,
+      "sha256": "b246b310352b796fe83717db2028348c0d9619b94128fa8016dfd3d07db3072b",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/v2_register_ranges.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_register_ranges.dsl",
+      "tracked": true,
+      "sha256": "1f1a4557f801ff5732409c283b8cf7fdf9e558da27d69ee4f7f8b86ee2e0d1ac",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/v2_rv32i_no_mul.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_rv32i_no_mul.dsl",
+      "tracked": true,
+      "sha256": "a9e1a459482abcc5e800ddf17ecb23c79e4bad86fbfd72a7b8c33a80fd0eacff",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/v2_rv32i_restricted_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_rv32i_restricted_shifts.dsl",
+      "tracked": true,
+      "sha256": "7b5a22df5f3d899f4b4522ae0e1256ca21a7374ded354ad09d98c33f8324e7ca",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/v2_sequential_demo.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_sequential_demo.dsl",
+      "tracked": true,
+      "sha256": "5998270b0f3054d382eb6329d6d051a68b1a72e679b92eda92e0877f2588641b",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/examples/v2_your_use_case.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_your_use_case.dsl",
+      "tracked": true,
+      "sha256": "e8e02db67b79c99b0380b97e87b236d0144f2238c67069b379b63b8d71b47855",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/baseline.dsl",
+      "tracked": true,
+      "sha256": "7367671fdccc2cf55746ef56a9f5888a932e97e941f7a5586549b3cf746b4994",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/rv32i_no_add_addi.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32i_no_add_addi.dsl",
+      "tracked": true,
+      "sha256": "ea40547cd0a23c6b6a4d6518945d78eea4708c4aa7a6771ace867b86b71d3b38",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/rv32im.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im.dsl",
+      "tracked": true,
+      "sha256": "4c42b042e5c26a12ec75da6bccac2fd9b04a896df7add22bddd1b06c08d92b61",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/rv32im_no_XOR.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_XOR.dsl",
+      "tracked": true,
+      "sha256": "0cb8702b495f432f3231531a757ccb13d1ec5c12d9a3b83cfdc60fe692507a9b",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/rv32im_no_add.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_add.dsl",
+      "tracked": true,
+      "sha256": "4af95393c2fbe5068e7923785817f42dfc58ece959c8607d1c16c18b1fe54ae7",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/rv32im_no_add_addi.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_add_addi.dsl",
+      "tracked": true,
+      "sha256": "a6206554c51c2ee69bcf6fa0b8fe07f80ee04871118d95691cb7be9d8cf5b1be",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/rv32im_no_add_sub.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_add_sub.dsl",
+      "tracked": true,
+      "sha256": "ff1c9e83e5836685f18cf0bb1a1615db5eb32b47cd958295bfcd8b6508972574",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/rv32im_no_bq.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_bq.dsl",
+      "tracked": true,
+      "sha256": "5d2aefd2777fff32cc6d4182d97f96f9fcd3c9968b742955a5dc3f120fb10fd1",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/rv32im_no_div.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_div.dsl",
+      "tracked": true,
+      "sha256": "0f4af891e25ed67526b5febce8a96f33b6686fac501128d397d9bfa39d6f0d82",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/rv32im_no_mul.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_mul.dsl",
+      "tracked": true,
+      "sha256": "f5af1fdbf29115493c52c16ea0f51b53454021b255c087b0ee4ff0d6bf14d187",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/rv32im_no_mul_no_div.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_mul_no_div.dsl",
+      "tracked": true,
+      "sha256": "085f2903cdc4e860a8245d31b04174d18276f4601faf1db3528efaea1cc314e3",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/rv32im_no_mul_no_div_no_rem.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_mul_no_div_no_rem.dsl",
+      "tracked": true,
+      "sha256": "bb8373d0abf2f3915b014134b56e1ed7e376a2660d12399dd26d31b494a19332",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/rv32im_no_sub.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_sub.dsl",
+      "tracked": true,
+      "sha256": "0f39ee1656efe1d185e0e8637b6360b19cac2640e630bdf64fc050a8b648a58b",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "PdatDsl/workload/v2_rv32i_restricted_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/v2_rv32i_restricted_shifts.dsl",
+      "tracked": true,
+      "sha256": "632f24c09c2657eff5f3d732d3da2b11a650d508f9c90e4ebe8c27ebc08f485f",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a"
+    },
+    "ScorrPdat/examples/shifts/baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/examples/shifts/baseline.dsl",
+      "tracked": true,
+      "sha256": "0ecf23968555a47be71730507a492f7d060ff98eceee1e0934da517dc4706895",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/examples/shifts/slli.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/examples/shifts/slli.dsl",
+      "tracked": true,
+      "sha256": "0fd7081a81d52a711aceff2e6553e4aa1a9b1b457796348ebc29ab4318d212ee",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/examples/shifts/slli2.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/examples/shifts/slli2.dsl",
+      "tracked": true,
+      "sha256": "f4c6ea966fd282211c193ceafb8bfab3fbece3e9e4737dea151294c512a73b39",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/experiments/reg_count/04regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/experiments/reg_count/04regs.dsl",
+      "tracked": true,
+      "sha256": "a3bee707ac3fbaf9a84bd69abdee69861388f0af359af09114f6d46b31c59efe",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/experiments/reg_count/08regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/experiments/reg_count/08regs.dsl",
+      "tracked": true,
+      "sha256": "a2399567856e6d440562799f144f878932db4fff5aaf368a6df86480aa1e663a",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/experiments/reg_count/16regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/experiments/reg_count/16regs.dsl",
+      "tracked": true,
+      "sha256": "f5df2a8fb0fec5f4dc35ef2e8418d2c2efbe48df74146cc9213548b1309b45d6",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/experiments/reg_count/32regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/experiments/reg_count/32regs.dsl",
+      "tracked": true,
+      "sha256": "b6d65a83105fe837ab657d7c09d534d88ceaa8a753a601d45bd90aebd76164d7",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/tests/regression/fixtures/baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/baseline.dsl",
+      "tracked": true,
+      "sha256": "545ba551d46cc40714fc69459669456be6948f6f7f1506c68c564860c9ee9c28",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/tests/regression/fixtures/odc_power_of_2_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/odc_power_of_2_shifts.dsl",
+      "tracked": true,
+      "sha256": "e05c7ed2f89aa85d42776cbca5124196adcb48d07ff21ce9f7c8f1ca0937a026",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/tests/regression/fixtures/odc_single_shift.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/odc_single_shift.dsl",
+      "tracked": true,
+      "sha256": "af177d3f15cb41513f4ad11093334318c818abd6e99f344067ed38094bb6d474",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/tests/regression/fixtures/simple_outlawed.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/simple_outlawed.dsl",
+      "tracked": true,
+      "sha256": "037d0962159fb37556b098ad88ee9b844e42e656a75a6c6cd93818be380ea415",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/tests/regression/fixtures/v2_baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/v2_baseline.dsl",
+      "tracked": true,
+      "sha256": "1f57f75d4d1923b87538657a85c7739a6ff28a0e7920454eab5a235ac6eef379",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/tests/regression/fixtures/v2_bitpattern_imm.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/v2_bitpattern_imm.dsl",
+      "tracked": true,
+      "sha256": "8547ef5dba301aa5533072aa4369c1b1e469826e37cd332c962b2d049456174b",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/tests/regression/fixtures/v2_forbid_mul.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/v2_forbid_mul.dsl",
+      "tracked": true,
+      "sha256": "d3ef06a3611369e2052813199f84a0e53ac417106bd68f691f084f578ea07e27",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/tests/regression/fixtures/v2_sequential.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/v2_sequential.dsl",
+      "tracked": true,
+      "sha256": "16f25692c2ec531916923080268a6eff6d492c2355d9abd43661497aa7208b60",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "ScorrPdat/tests/regression/fixtures/v2_shamt_restrict.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/v2_shamt_restrict.dsl",
+      "tracked": true,
+      "sha256": "62489117f794f2377f23bb65da1ba01fad14a34761fd2d60a8ef7fba714fbd9b",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99"
+    },
+    "BoundedDynamicPscorr/examples/shifts/baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/examples/shifts/baseline.dsl",
+      "tracked": true,
+      "sha256": "0ecf23968555a47be71730507a492f7d060ff98eceee1e0934da517dc4706895",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/examples/shifts/slli.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/examples/shifts/slli.dsl",
+      "tracked": true,
+      "sha256": "0fd7081a81d52a711aceff2e6553e4aa1a9b1b457796348ebc29ab4318d212ee",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/examples/shifts/slli2.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/examples/shifts/slli2.dsl",
+      "tracked": true,
+      "sha256": "f4c6ea966fd282211c193ceafb8bfab3fbece3e9e4737dea151294c512a73b39",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/experiments/reg_count/04regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/experiments/reg_count/04regs.dsl",
+      "tracked": true,
+      "sha256": "a3bee707ac3fbaf9a84bd69abdee69861388f0af359af09114f6d46b31c59efe",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/experiments/reg_count/08regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/experiments/reg_count/08regs.dsl",
+      "tracked": true,
+      "sha256": "a2399567856e6d440562799f144f878932db4fff5aaf368a6df86480aa1e663a",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/experiments/reg_count/16regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/experiments/reg_count/16regs.dsl",
+      "tracked": true,
+      "sha256": "f5df2a8fb0fec5f4dc35ef2e8418d2c2efbe48df74146cc9213548b1309b45d6",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/experiments/reg_count/32regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/experiments/reg_count/32regs.dsl",
+      "tracked": true,
+      "sha256": "b6d65a83105fe837ab657d7c09d534d88ceaa8a753a601d45bd90aebd76164d7",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/baseline.dsl",
+      "tracked": true,
+      "sha256": "545ba551d46cc40714fc69459669456be6948f6f7f1506c68c564860c9ee9c28",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/odc_power_of_2_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/odc_power_of_2_shifts.dsl",
+      "tracked": true,
+      "sha256": "e05c7ed2f89aa85d42776cbca5124196adcb48d07ff21ce9f7c8f1ca0937a026",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/odc_single_shift.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/odc_single_shift.dsl",
+      "tracked": true,
+      "sha256": "af177d3f15cb41513f4ad11093334318c818abd6e99f344067ed38094bb6d474",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/simple_outlawed.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/simple_outlawed.dsl",
+      "tracked": true,
+      "sha256": "037d0962159fb37556b098ad88ee9b844e42e656a75a6c6cd93818be380ea415",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/v2_baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/v2_baseline.dsl",
+      "tracked": true,
+      "sha256": "1f57f75d4d1923b87538657a85c7739a6ff28a0e7920454eab5a235ac6eef379",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/v2_bitpattern_imm.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/v2_bitpattern_imm.dsl",
+      "tracked": true,
+      "sha256": "8547ef5dba301aa5533072aa4369c1b1e469826e37cd332c962b2d049456174b",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/v2_forbid_mul.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/v2_forbid_mul.dsl",
+      "tracked": true,
+      "sha256": "d3ef06a3611369e2052813199f84a0e53ac417106bd68f691f084f578ea07e27",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/v2_sequential.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/v2_sequential.dsl",
+      "tracked": true,
+      "sha256": "16f25692c2ec531916923080268a6eff6d492c2355d9abd43661497aa7208b60",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/v2_shamt_restrict.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/v2_shamt_restrict.dsl",
+      "tracked": true,
+      "sha256": "62489117f794f2377f23bb65da1ba01fad14a34761fd2d60a8ef7fba714fbd9b",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8"
+    }
+  },
+  "dependencies": {
+    "PyYAML": "6.0.3",
+    "jsonschema": "4.25.1",
+    "dd": "0.6.0"
+  },
+  "legacy_implementation": {
+    "pdat_dsl/__init__.py": {
+      "baseline_sha256": "c84eb18c14ebfe7d7dc79796f602d21c21ca3cd4594ec0df736e0b8b2724c8d2",
+      "current_sha256": "c84eb18c14ebfe7d7dc79796f602d21c21ca3cd4594ec0df736e0b8b2724c8d2"
+    },
+    "pdat_dsl/parser.py": {
+      "baseline_sha256": "5e097160309c4b19b18e7c283498bf6ba4420ccf8a03db1f57e1843719f1b5d1",
+      "current_sha256": "5e097160309c4b19b18e7c283498bf6ba4420ccf8a03db1f57e1843719f1b5d1"
+    },
+    "pdat_dsl/config.py": {
+      "baseline_sha256": "b639fe895e5719e33ccede00c573144580b62f0f5f5e406a59df0f02d7b93cbb",
+      "current_sha256": "b639fe895e5719e33ccede00c573144580b62f0f5f5e406a59df0f02d7b93cbb"
+    },
+    "pdat_dsl/codegen.py": {
+      "baseline_sha256": "94b4864ce9cfa5069c2343e1339d5ff7609252df07b45da50dd53789c3b19193",
+      "current_sha256": "94b4864ce9cfa5069c2343e1339d5ff7609252df07b45da50dd53789c3b19193"
+    },
+    "pdat_dsl/codegen_v2_aig.py": {
+      "baseline_sha256": "850109fc528fa23b200554e0ad92a12f382143444ba3922adc3034a52e5bb1bf",
+      "current_sha256": "850109fc528fa23b200554e0ad92a12f382143444ba3922adc3034a52e5bb1bf"
+    },
+    "pdat_dsl/dtype_codegen.py": {
+      "baseline_sha256": "929e63bd786ca849cb08d70cff7d1f567cf8848d9db5c26a7aee05016038c266",
+      "current_sha256": "929e63bd786ca849cb08d70cff7d1f567cf8848d9db5c26a7aee05016038c266"
+    },
+    "pdat_dsl/aig_constraints.py": {
+      "baseline_sha256": "e5892c3329f132951c28e2529e81322cf81981dcf0358c81f0f21a2287c99a53",
+      "current_sha256": "e5892c3329f132951c28e2529e81322cf81981dcf0358c81f0f21a2287c99a53"
+    },
+    "pdat_dsl/bdd_ops.py": {
+      "baseline_sha256": "5915f03627355cb900bdd8096273d838a39ccfb5d35eafc44a36b69894dd1236",
+      "current_sha256": "5915f03627355cb900bdd8096273d838a39ccfb5d35eafc44a36b69894dd1236"
+    },
+    "pdat_dsl/encodings.py": {
+      "baseline_sha256": "4624ca66990bd83e15f285e1b234ae75e8a0bd84eaf9c9e5cbcf43ad44eef1b1",
+      "current_sha256": "4624ca66990bd83e15f285e1b234ae75e8a0bd84eaf9c9e5cbcf43ad44eef1b1"
+    },
+    "pdat_dsl/hierarchical_synth.py": {
+      "baseline_sha256": "e1f8354586a796b568c60a4e32a4f35c154ef9c9b66fb26c5593b511ed28fb53",
+      "current_sha256": "e1f8354586a796b568c60a4e32a4f35c154ef9c9b66fb26c5593b511ed28fb53"
+    },
+    "pdat_dsl/rtl_patcher.py": {
+      "baseline_sha256": "2412d8a61d91925a0c202de6bed7a05a8618e3e6f2301ddb65f3eb5d5dc69c84",
+      "current_sha256": "2412d8a61d91925a0c202de6bed7a05a8618e3e6f2301ddb65f3eb5d5dc69c84"
+    },
+    "configs/boom.yaml": {
+      "baseline_sha256": "4274cad37ab907d987ee9ce0bc8230fa7b0de529acb3d41633a4756613e1346d",
+      "current_sha256": "4274cad37ab907d987ee9ce0bc8230fa7b0de529acb3d41633a4756613e1346d"
+    },
+    "configs/ibex.yaml": {
+      "baseline_sha256": "ffdeb1071b1a33e69ccbaefbd172f3a2c98edaedff40d8e7cdf51a2a48a8f031",
+      "current_sha256": "ffdeb1071b1a33e69ccbaefbd172f3a2c98edaedff40d8e7cdf51a2a48a8f031"
+    },
+    "configs/riscvsinglecycle.yaml": {
+      "baseline_sha256": "af54a2071bca12bcf778698a4ea49f8fb3924a036a799a5ab340070cb451aa50",
+      "current_sha256": "af54a2071bca12bcf778698a4ea49f8fb3924a036a799a5ab340070cb451aa50"
+    },
+    "configs/rocket.yaml": {
+      "baseline_sha256": "07533d4b7cf31583b07ff4ba05b883d908b7f64ab4a9512c2c334c53dca8d21b",
+      "current_sha256": "07533d4b7cf31583b07ff4ba05b883d908b7f64ab4a9512c2c334c53dca8d21b"
+    },
+    "configs/schema.yaml": {
+      "baseline_sha256": "018e0ca96693829e200e69c59e15ea8b36687f37b422c25aa2cb5875bc2269c6",
+      "current_sha256": "018e0ca96693829e200e69c59e15ea8b36687f37b422c25aa2cb5875bc2269c6"
+    }
+  },
+  "changed_legacy_implementation": [],
+  "inputs_changed_during_audit": [],
+  "input_count": 78,
+  "case_count": 546,
+  "successful_cases": 546,
+  "artifact_count": 581,
+  "nonempty_artifact_count": 435,
+  "baseline_errors": [],
+  "mismatches": [],
+  "baseline_unexpanded_timing_templates": [
+    {
+      "case": "21",
+      "input": "PdatDsl/Motivation/pdat.dsl",
+      "config": "default",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "22",
+      "input": "PdatDsl/Motivation/pdat.dsl",
+      "config": "ibex",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "23",
+      "input": "PdatDsl/Motivation/pdat.dsl",
+      "config": "boom",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "24",
+      "input": "PdatDsl/Motivation/pdat.dsl",
+      "config": "rocket",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "25",
+      "input": "PdatDsl/Motivation/pdat.dsl",
+      "config": "riscvsinglecycle",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "28",
+      "input": "PdatDsl/Motivation/v2_rv32i_restricted_shifts.dsl",
+      "config": "default",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "29",
+      "input": "PdatDsl/Motivation/v2_rv32i_restricted_shifts.dsl",
+      "config": "ibex",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "30",
+      "input": "PdatDsl/Motivation/v2_rv32i_restricted_shifts.dsl",
+      "config": "boom",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "31",
+      "input": "PdatDsl/Motivation/v2_rv32i_restricted_shifts.dsl",
+      "config": "rocket",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "32",
+      "input": "PdatDsl/Motivation/v2_rv32i_restricted_shifts.dsl",
+      "config": "riscvsinglecycle",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "105",
+      "input": "PdatDsl/examples/rv32i_timing.dsl",
+      "config": "default",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "106",
+      "input": "PdatDsl/examples/rv32i_timing.dsl",
+      "config": "ibex",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "107",
+      "input": "PdatDsl/examples/rv32i_timing.dsl",
+      "config": "boom",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "108",
+      "input": "PdatDsl/examples/rv32i_timing.dsl",
+      "config": "rocket",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "109",
+      "input": "PdatDsl/examples/rv32i_timing.dsl",
+      "config": "riscvsinglecycle",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "154",
+      "input": "PdatDsl/examples/rv32im_no_mul_timing.dsl",
+      "config": "default",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "155",
+      "input": "PdatDsl/examples/rv32im_no_mul_timing.dsl",
+      "config": "ibex",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "156",
+      "input": "PdatDsl/examples/rv32im_no_mul_timing.dsl",
+      "config": "boom",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "157",
+      "input": "PdatDsl/examples/rv32im_no_mul_timing.dsl",
+      "config": "rocket",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "158",
+      "input": "PdatDsl/examples/rv32im_no_mul_timing.dsl",
+      "config": "riscvsinglecycle",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "161",
+      "input": "PdatDsl/examples/rv32im_timing.dsl",
+      "config": "default",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "162",
+      "input": "PdatDsl/examples/rv32im_timing.dsl",
+      "config": "ibex",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "163",
+      "input": "PdatDsl/examples/rv32im_timing.dsl",
+      "config": "boom",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "164",
+      "input": "PdatDsl/examples/rv32im_timing.dsl",
+      "config": "rocket",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "165",
+      "input": "PdatDsl/examples/rv32im_timing.dsl",
+      "config": "riscvsinglecycle",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "168",
+      "input": "PdatDsl/examples/rv32im_timing_strict.dsl",
+      "config": "default",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "169",
+      "input": "PdatDsl/examples/rv32im_timing_strict.dsl",
+      "config": "ibex",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "170",
+      "input": "PdatDsl/examples/rv32im_timing_strict.dsl",
+      "config": "boom",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "171",
+      "input": "PdatDsl/examples/rv32im_timing_strict.dsl",
+      "config": "rocket",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "172",
+      "input": "PdatDsl/examples/rv32im_timing_strict.dsl",
+      "config": "riscvsinglecycle",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "203",
+      "input": "PdatDsl/examples/v2_rv32i_restricted_shifts.dsl",
+      "config": "default",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "204",
+      "input": "PdatDsl/examples/v2_rv32i_restricted_shifts.dsl",
+      "config": "ibex",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "205",
+      "input": "PdatDsl/examples/v2_rv32i_restricted_shifts.dsl",
+      "config": "boom",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "206",
+      "input": "PdatDsl/examples/v2_rv32i_restricted_shifts.dsl",
+      "config": "rocket",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    },
+    {
+      "case": "207",
+      "input": "PdatDsl/examples/v2_rv32i_restricted_shifts.dsl",
+      "config": "riscvsinglecycle",
+      "artifact": "assumptions_timing.sv",
+      "unexpanded_names": [
+        "{clk}",
+        "{data_gnt}",
+        "{data_req}",
+        "{data_rvalid}",
+        "{instr_gnt}",
+        "{instr_req}",
+        "{rst_n}"
+      ]
+    }
+  ],
+  "passed": true,
+  "limits": [
+    "Compares generated SVA bytes; does not rerun synthesis, timing analysis, or processor verification.",
+    "Baseline generation failures are preserved and reported, not counted as successful generation.",
+    "Hierarchical operand checks exercise the actual emission API with a fixed explicit module binding at both 32 and 64 bits.",
+    "New examples/frontend golden pairs are checked separately by tests/test_frontend_compatibility.py.",
+    "Successful generation and byte parity do not establish valid HDL: inherited timing-template placeholders are reported separately.",
+    "Dynamic-scheduling experiments use independently written formal RTL; this audit does not claim to regenerate those artifacts."
+  ]
+}

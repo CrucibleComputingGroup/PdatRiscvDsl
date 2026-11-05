@@ -1,0 +1,18 @@
+{
+  "command": [
+    "python3",
+    "scripts/check_sva_compatibility.py",
+    "--corpus-snapshot",
+    "review/frontend_compatibility/corpus.json",
+    "--output",
+    "/tmp/crisp-legacy-sva-snapshot-reproduction-20261105",
+    "--hash-seed",
+    "0"
+  ],
+  "input_count": 78,
+  "case_count": 546,
+  "artifact_count": 581,
+  "passed": true,
+  "all_baseline_output_hashes_match_original_live_audit": true,
+  "corpus_sha256": "bf27d122dc696b1f040304004a6333c7b032489505a0f7eb9c703cc422970b83"
+}

@@ -1,0 +1,7 @@
+/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv:14: error: Unable to bind wire/reg/memory `rst_n' in `timing_check'
+/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv:14: error: Concatenation/replication may not have zero width in this context.
+/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv:14: error: Unable to elaborate condition expression.
+/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv:35: error: Unable to bind wire/reg/memory `rst_n' in `timing_check'
+/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv:35: error: Concatenation/replication may not have zero width in this context.
+/tmp/crisp-legacy-timing-diagnostic-20261105/baseline_timing_wrapper.sv:35: error: Unable to elaborate condition expression.
+Elaboration failed

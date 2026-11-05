@@ -2,26 +2,25 @@
 
 A Domain-Specific Language (DSL) for specifying RISC-V ISA subsets and generating SystemVerilog assertions for formal verification and hardware synthesis optimization.
 
-## CRISP 3 typed contracts
+## Checked CRISP frontend
 
-The opt-in `contract` command adds checked bit-vector expressions, explicit
-sampling events, reusable predicate libraries, exact RV32IM instruction sets,
-bounded response properties, and guarded observations. It emits a SystemVerilog
-monitor and a JSON manifest; candidate RTL cuts remain unproved obligations.
-See the [language manual](docs/CRISP3.md) and [research assessment](docs/RESEARCH.md).
+The `frontend` command adds reusable predicates, typed constraint blocks, explicit
+backend contexts, and solver checks that translation neither loses nor
+adds values within each local operand domain. It expands into the existing DSL and invokes the unchanged
+SVA generator. See the [frontend manual](docs/FRONTEND.md).
 
 ```bash
-# Python 3.8+; Z3 is optional unless using --witnesses
-pip install -e ".[contracts]"
-python3 -m pdat_dsl contract examples/contracts/remainder.crisp \
-  --output /tmp/remainder.sv --witnesses
-
-# Validation also requires Yosys and Icarus Verilog on PATH
-python3 -m pytest -q tests/test_contracts.py
+# Python 3.8+
+pip install -e ".[frontend]"
+PYTHONHASHSEED=0 python -m pdat_dsl frontend examples/frontend/operands.crisp \
+  /tmp/narrow.sv --target ibex --module-dtype operand_scope --emit-legacy /tmp/narrow.dsl \
+  --manifest /tmp/narrow.json
 ```
 
-The existing commands below retain their historical behavior. The new front end
-has separate language validation and has not regenerated the published PPA runs.
+The previous experimental `contract` command remains available; it is a separate
+emitter and is not the path for preserving experiment SVA. Its documentation is
+in [CRISP3.md](docs/CRISP3.md). The legacy commands below retain their historical
+behavior, including the [inherited limitations](docs/FRONTEND.md#compatibility-and-inherited-limitations).
 
 ## Overview
 

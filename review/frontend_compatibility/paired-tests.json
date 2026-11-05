@@ -1,0 +1,67 @@
+{
+  "baseline_commit": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+  "command": [
+    "python3",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_frontend_compatibility.py"
+  ],
+  "result": "63 passed in 33.08s",
+  "passed": 63,
+  "failed": 0,
+  "python": "3.13.2",
+  "hash_seeds": [
+    0,
+    29
+  ],
+  "configurations": [
+    "default",
+    "ibex",
+    "boom",
+    "rocket",
+    "riscvsinglecycle"
+  ],
+  "cases": {
+    "inline_cli": 40,
+    "operand_only_cli_vs_module_api": 10,
+    "direct_module_api": 4,
+    "cli_rejection": 3,
+    "audit_mutation_control": 1,
+    "import_library_collision_rejection": 4,
+    "module_check_metadata": 1
+  },
+  "inline_pairs": [
+    "narrow",
+    "timing",
+    "ordered_isa",
+    "fields"
+  ],
+  "module_pair": "operands",
+  "explicit_legacy_parity_pairs": [
+    "narrow",
+    "timing"
+  ],
+  "comparison": "Exact bytes against generator/API exported from the immutable baseline commit; no whitespace or ordering normalization.",
+  "limits": [
+    "Legacy-parity timing and narrow examples deliberately preserve inherited defects; they are not artifact-validity or semantic-correctness evidence.",
+    "No synthesis, PPA, or processor-equivalence experiment was rerun."
+  ],
+  "tested_file_sha256": {
+    "scripts/check_sva_compatibility.py": "c08d5c5a4bf9ecf6b3d674bc6044bd3581377da1020983401b3e94f605311359",
+    "tests/test_frontend_compatibility.py": "7797ec8c47e4814d90a8a89999ee5b8a267c745bb64cd413543a33e3e0fd602c",
+    "pdat_dsl/frontend.py": "2cf3cb1fffc49098a94e02aeab50b5a18c03e5736b961e0982d17f5247e1df9c",
+    "pdat_dsl/frontend_cli.py": "e31113027cb522f7f23769418a0ec247ed8f6cab98bf1d62961749aca3f9dcb7",
+    "pdat_dsl/__main__.py": "76a106bb5c7794c372ac202e51a5efc978d714b7da3e7d5dded16a1e2936032d",
+    "examples/frontend/fields.crisp": "7b4e9c7f03e92714322ff64b29dedc1cf4d55daaa00f263f52fc5c998957ac51",
+    "examples/frontend/narrow.crisp": "3a1b9e0be597d8c8466d419eb0b67be6dcb194b51025130795bb13593033a7e6",
+    "examples/frontend/operands.crisp": "9637c7458613adb0f7d5be189ea092519ff17cb1c171e26505dad63b87dfdf40",
+    "examples/frontend/ordered_isa.crisp": "0561fd104b2af2802543fc46ad151171fc843d141c7678149052a5f8fb8d510e",
+    "examples/frontend/timing.crisp": "869d97c4b8cff1e29d3e1973d21965db43c2a65f41e4cfaa3b4f413ca29678ba",
+    "examples/frontend/fields.dsl": "6f5c7dbf8c47106827562c61a54471679158c2ca628c9ac30473aed9cc8798af",
+    "examples/frontend/narrow.dsl": "c255bbbf48e37e200709c6c23c1da35db9d7047f1e2ce0cea6c660f9727637c1",
+    "examples/frontend/operands.dsl": "936df0be998c9286d9d12499b4e9ce5f93537269d6b1f6a39d5c3655d075a295",
+    "examples/frontend/ordered_isa.dsl": "897d41899478c6c436d1a159f89dcf0282e6c3e9cfa442fbdca606b7068a49d7",
+    "examples/frontend/timing.dsl": "8ffc7c881619e52ea1e0a3a3252aaa7fec0fd576bb886cfdae682691e36fcfcf"
+  }
+}

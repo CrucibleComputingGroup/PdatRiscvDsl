@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "-m",
+    "pytest",
+    "-q"
+  ],
+  "result": "222 passed in 37.81s",
+  "passed": 222,
+  "failed": 0,
+  "python": "3.13.2",
+  "dependencies": {
+    "pytest": "9.1.1",
+    "z3-solver": "5.1.0.0"
+  },
+  "tested_file_sha256": {
+    "tests/test_contracts.py": "6c4f3a9b2eb014c8c54d979f93452afd5376c8da888e28792371973bed0bd20d",
+    "tests/test_frontend.py": "ff88f97514dd157335609f07fc80f52f51592a031bb2bc1cd62667e342d8de05",
+    "tests/test_frontend_compatibility.py": "7797ec8c47e4814d90a8a89999ee5b8a267c745bb64cd413543a33e3e0fd602c",
+    "pdat_dsl/frontend.py": "2cf3cb1fffc49098a94e02aeab50b5a18c03e5736b961e0982d17f5247e1df9c",
+    "pdat_dsl/frontend_cli.py": "e31113027cb522f7f23769418a0ec247ed8f6cab98bf1d62961749aca3f9dcb7"
+  },
+  "limits": [
+    "No processor synthesis, PPA, or full processor equivalence run is represented by these tests."
+  ]
+}

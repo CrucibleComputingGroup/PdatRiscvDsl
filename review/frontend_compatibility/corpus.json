@@ -1,0 +1,550 @@
+{
+  "inputs": {
+    "PdatDsl/Motivation/aesip_1.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/Motivation/aesip_1.dsl",
+      "tracked": true,
+      "sha256": "055d8413933076517c2de38281ecd2bc69a6dfa5218a4b36d1f213fedf6fff11",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "require RV32I\nrequire RV32M\n\ninstruction ADD\ninstruction AND\ninstruction ANDI \ninstruction BEQ\ninstruction BGE\ninstruction BGEU\ninstruction LB\ninstruction LBU \ninstruction LH\ninstruction LHU\ninstruction MULHSU\ninstruction MULHU\ninstruction MULH"
+    },
+    "PdatDsl/Motivation/aesip_2.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/Motivation/aesip_2.dsl",
+      "tracked": true,
+      "sha256": "644cc7e64d6eb954f90129dc5d1144324f24d09a39569f0afcc0d89322264893",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "require RV32I\nrequire RV32M\n\ninstruction ADD\ninstruction AND\ninstruction ANDI \ninstruction BEQ\ninstruction BGE\ninstruction BGEU\ninstruction LB\ninstruction LBU \ninstruction LH\ninstruction LHU\ninstruction MULHSU\ninstruction MULHU\ninstruction MULH\ninstruction MUL"
+    },
+    "PdatDsl/Motivation/baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/Motivation/baseline.dsl",
+      "tracked": true,
+      "sha256": "7367671fdccc2cf55746ef56a9f5888a932e97e941f7a5586549b3cf746b4994",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Outlaw all multiply and divide instructions (RV32M extension)\n\n# Outlaw specific patterns\n# Example: Outlaw ADD when destination is x0 (NOP-like behavior)\n\n# Low-level pattern example\n# pattern 0x00000013 mask 0xFFFFFFFF  # ADDI x0, x0, 0 (canonical NOP)\n"
+    },
+    "PdatDsl/Motivation/pdat.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/Motivation/pdat.dsl",
+      "tracked": true,
+      "sha256": "9a6649a6959bc492aa722ddbaacdfd7e672d58b022b1adb77a65887ddd0475df",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "require RV32I\nrequire RV32M\n\ninstruction AND\ninstruction ANDI \ninstruction BGE\ninstruction BGEU\ninstruction LB\ninstruction LH\ninstruction MULHSU\ninstruction MULHU\n\ninstr_hit_latency 1\ninstr_miss_latency 5\ndata_hit_latency 1\ndata_miss_latency 4"
+    },
+    "PdatDsl/Motivation/v2_rv32i_restricted_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/Motivation/v2_rv32i_restricted_shifts.dsl",
+      "tracked": true,
+      "sha256": "7b5a22df5f3d899f4b4522ae0e1256ca21a7374ded354ad09d98c33f8324e7ca",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "version 2\n\n# Example: Full RV32I but with restricted shift amounts\n# Demonstrates sequential include/forbid operations\n\n# Start with full RV32I instruction set\ninclude RV32I\n\n# Remove all shift instructions\nforbid SLLI\nforbid SRLI\nforbid SRAI\n\n# Add back only shifts with amount 0-7 (3-bit shifts)\ninclude SLLI {shamt = 5'b00000}\ninclude SLLI {shamt = 5'b00001}\ninclude SLLI {shamt = 5'b00010}\ninclude SLLI {shamt = 5'b00011}\ninclude SLLI {shamt = 5'b00100}\ninclude SLLI {shamt = 5'b00101}\ninclude SLLI {shamt = 5'b00110}\ninclude SLLI {shamt = 5'b00111}\n\ninclude SRLI {shamt = 5'b00000}\ninclude SRLI {shamt = 5'b00001}\ninclude SRLI {shamt = 5'b00010}\ninclude SRLI {shamt = 5'b00011}\ninclude SRLI {shamt = 5'b00100}\ninclude SRLI {shamt = 5'b00101}\ninclude SRLI {shamt = 5'b00110}\ninclude SRLI {shamt = 5'b00111}\n\ninclude SRAI {shamt = 5'b00000}\ninclude SRAI {shamt = 5'b00001}\ninclude SRAI {shamt = 5'b00010}\ninclude SRAI {shamt = 5'b00011}\ninclude SRAI {shamt = 5'b00100}\ninclude SRAI {shamt = 5'b00101}\ninclude SRAI {shamt = 5'b00110}\ninclude SRAI {shamt = 5'b00111}\n\n# Result: Full RV32I with all shift instructions limited to 3-bit shift amounts (0-7)\n# Upper 2 bits of shift amount are constrained to 00\n\ninstr_hit_latency 1\ninstr_miss_latency 5\ndata_hit_latency 1\ndata_miss_latency 4"
+    },
+    "PdatDsl/examples/allow_shifts_example.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/allow_shifts_example.dsl",
+      "tracked": true,
+      "sha256": "0413a3429ca4dbd1a2342bbdfcc0d62adc3e17eeb3ef89010b4fdfa83b16d6e0",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example: Allow ONLY specific shift amounts using 'allow' keyword\n# This demonstrates positive constraints with bit patterns\n\nrequire RV32I\n\n# Allow ONLY SLLI with shift amounts 0-3 (forbid all others: 4-31)\n# Using 'allow' keyword inverts the semantics\n#\n# Pattern: 12'b0000000000xx\n# - Upper 7 bits (funct7): 0000000 (required for SLLI)\n# - Lower 5 bits (shamt): 000xx (matches 0, 1, 2, 3)\n#\n# With 'allow' semantics: This pattern is the ONLY one allowed\n# All other SLLI patterns (shamt 4-31) are implicitly forbidden\nallow instruction SLLI { imm = 12'b00000000000x }  # Allow shifts 0-1\nallow instruction SLLI { imm = 12'b000000000010 }  # Allow shift 2\nallow instruction SLLI { imm = 12'b000000000011 }  # Allow shift 3\n\n# Result: Only SLLI with shamt in {0, 1, 2, 3} is allowed\n# SLLI with shamt in {4, 5, ..., 31} is forbidden\n\n# Alternative: Using a pattern with don't-cares to cover multiple values\n# allow instruction SLLI { imm = 12'b00000000000x }  # Covers shamt 0-3 in one rule\n#   This would expand to: allow shamt 0, 1, 2, 3\n\n# Note: The 'allow' keyword is recognized by the parser but not fully\n# implemented in codegen yet. It currently prints a warning.\n# Full implementation will generate complementary patterns that forbid\n# everything EXCEPT the allowed patterns.\n"
+    },
+    "PdatDsl/examples/bitpattern_addi_powers_of_two.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/bitpattern_addi_powers_of_two.dsl",
+      "tracked": true,
+      "sha256": "fb4a2be0e6a90d6979e7e27392a9de8aa075142ddc859742b279428eed668a6b",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example: Restrict ADDI immediate to powers of 2\n# Demonstrates bit patterns for specific immediate values\n\nrequire RV32I\n\n# ADDI has a 12-bit signed immediate in bits [31:20]\n\n# Allow only ADDI with immediate = 1 (0x001)\ninstruction ADDI { imm = 12'b000000000001 }\n\n# Allow only ADDI with immediate = 2 (0x002)\ninstruction ADDI { imm = 12'b000000000010 }\n\n# Allow only ADDI with immediate = 4 (0x004)\ninstruction ADDI { imm = 12'b000000000100 }\n\n# Allow only ADDI with immediate = 8 (0x008)\ninstruction ADDI { imm = 12'b000000001000 }\n\n# Result (in outlawing semantics): These specific values are forbidden\n# All other immediate values are allowed\n\n# For positive constraint (allow ONLY these), use:\n# allow instruction ADDI { imm = 12'b000000000001 }\n# allow instruction ADDI { imm = 12'b000000000010 }\n# allow instruction ADDI { imm = 12'b000000000100 }\n# allow instruction ADDI { imm = 12'b000000001000 }\n# (Only powers of 2 from 1-8 would be allowed)\n"
+    },
+    "PdatDsl/examples/data_type_constraints.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/data_type_constraints.dsl",
+      "tracked": true,
+      "sha256": "273b4b8c42d6a76a72fcce2a0047b0383149908051bf123c7fb5ea38b3165a42",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example: Data Type Constraints\n# This demonstrates specifying data width and signedness constraints\n# for RISC-V instructions\n\n# Specify valid instruction set\nrequire RV32I\nrequire RV32M\n\n# ============================================================================\n# Instruction-Level Data Type Constraints\n# ============================================================================\n# These constraints apply to all operands of an instruction.\n# Useful when all operands are treated uniformly (e.g., all 16-bit signed).\n\n# Without negation (~): FORBID instructions using these types\n# MUL: forbid when using 16-bit signed\ninstruction MUL { dtype = i16 }\n\n# MULH: forbid when using 8-bit signed\ninstruction MULH { dtype = i8 }\n\n# Multiple types: forbid when using 8-bit OR 16-bit signed\ninstruction DIV { dtype = i8 | i16 }\n\n# With negation (~): ALLOW ONLY these types (forbid all others)\n# DIVU: allow only 8-bit and 16-bit unsigned (forbid i32, i64, u32, u64)\n# Note: must include u8 when allowing u16 (can't distinguish u8 from u16 when value < 256)\ninstruction DIVU { dtype = ~(u8 | u16) }\n\n# REM: allow only 8-bit types signed or unsigned (forbid everything wider)\ninstruction REM { dtype = ~(i8 | u8) }\n\n# REMU: allow only 8-bit and 16-bit types (both signed and unsigned)\n# Note: when allowing i16/u16, must also allow i8/u8\ninstruction REMU { dtype = ~(i8 | u8 | i16 | u16) }\n\n# ============================================================================\n# Per-Operand Data Type Constraints\n# ============================================================================\n# These constraints specify types for individual operands (rd, rs1, rs2).\n# Useful for mixed-width operations or different signedness requirements.\n\n# MULHU: unsigned multiplication, upper bits\n# All operands are unsigned 16-bit\ninstruction MULHU { rd_dtype = u16, rs1_dtype = u16, rs2_dtype = u16 }\n\n# Mixed signedness example\n# Destination and rs1 are signed 8-bit, rs2 can be signed or unsigned 8-bit\ninstruction MULHSU { rd_dtype = i8, rs1_dtype = i8, rs2_dtype = i8 | u8 }\n\n# Different widths example\n# This shows a case where destination might be wider, but sources are constrained\n# (Note: semantically this may not make sense for all instructions, just demonstrating syntax)\ninstruction ADD { rs1_dtype = i8, rs2_dtype = i8 }\n\n# ============================================================================\n# Combining with Register Constraints\n# ============================================================================\n# You can combine data type constraints with register field constraints\n\n# MUL with specific register and data type constraints\ninstruction MUL { rd = x5, rs1_dtype = i16, rs2_dtype = i16 }\n\n# DIV with wildcard register and data type\ninstruction DIVU { rd = *, rs1_dtype = u8, rs2_dtype = u8 }\n\n# ============================================================================\n# Data Type Semantics\n# ============================================================================\n# i8:  8-bit signed   (-128 to 127) - sign-extended to full register width\n# u8:  8-bit unsigned (0 to 255)    - zero-extended to full register width\n# i16: 16-bit signed  (-32768 to 32767) - sign-extended\n# u16: 16-bit unsigned (0 to 65535)     - zero-extended\n# i32: 32-bit signed   (full register on RV32)\n# u32: 32-bit unsigned (full register on RV32)\n# i64: 64-bit signed   (for RV64)\n# u64: 64-bit unsigned (for RV64)\n\n# ============================================================================\n# Type Expression Syntax\n# ============================================================================\n# The pipe operator (|) allows specifying multiple types in a union:\n#   dtype = i8 | u8 | i16\n#\n# The negation prefix (~) inverts the meaning (can only appear at start):\n#   dtype = i8       \u2192 forbid when using i8\n#   dtype = ~i8      \u2192 forbid when NOT using i8 (i.e., allow only i8)\n#   dtype = i8 | u8  \u2192 forbid when using i8 OR u8\n#   dtype = ~(i8 | u8) \u2192 forbid when NOT using i8 or u8 (i.e., allow only i8 or u8)\n#\n# Note: The ~ is a type expression prefix, not a general operator.\n# It can only appear once at the very beginning of the expression.\n#\n# Valid:   ~i16, ~(i16 | u16), ~(i8 | u8 | i16 | u16)\n# Invalid: ~~i16, i16 | ~u16, ~i16 | ~u16\n\n# ============================================================================\n# Use Cases\n# ============================================================================\n# 1. Hardware Optimization: Indicate that multiply unit only needs 16-bit inputs,\n#    allowing synthesis tools to optimize away upper bits\n#\n# 2. Formal Verification: Generate assertions that operands are within\n#    specified bit ranges\n#\n# 3. Power Analysis: Understand data switching activity for power estimation\n#\n# 4. Code Generation: Constrain compiler to only use specific data types,\n#    ensuring optimized code paths\n"
+    },
+    "PdatDsl/examples/example_16reg.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/example_16reg.dsl",
+      "tracked": true,
+      "sha256": "34d9658a2e233962b18cf99d7a1b1f58ee59e2a3cdeec23863d424fdfac2e3ea",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example: RISC-V with only 16 registers (x0-x15)\n# This demonstrates using register constraints to reduce the register file\n\n# Specify valid instruction set\nrequire RV32I\nrequire RV32M\n\n# Limit to 16 registers (effectively RV32E)\nrequire_registers x0-x21\n\n# Still outlaw multiplication if not needed\n# (Even though we don't require RV32M, we can be explicit)\ninstruction MUL\ninstruction MULH\ninstruction MULHSU\ninstruction MULHU\ninstruction DIV\ninstruction DIVU\ninstruction REM\ninstruction REMU\n"
+    },
+    "PdatDsl/examples/example_outlawed.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/example_outlawed.dsl",
+      "tracked": true,
+      "sha256": "eac2ee0c113017d1b60440bd1661d796e797498fb8185a4a2c9a130be0041c13",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Specify which instruction extensions are valid (positive constraints)\n# This tells the optimizer that ONLY instructions from these extensions are valid\nrequire RV32I\nrequire RV32M\n\n# Outlaw all multiply and divide instructions (RV32M extension)\n# Even though RV32M is required above, these specific instructions are outlawed\ninstruction MUL\ninstruction MULH\ninstruction MULHSU\ninstruction MULHU\ninstruction DIV\ninstruction DIVU\ninstruction REM\ninstruction REMU\n\n# Outlaw specific patterns\n# Example: Outlaw ADD when destination is x0 (NOP-like behavior)\ninstruction ADD { rd = x0 }\n\n# Low-level pattern example\n# pattern 0x00000013 mask 0xFFFFFFFF  # ADDI x0, x0, 0 (canonical NOP)\n"
+    },
+    "PdatDsl/examples/none_outlawed.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/none_outlawed.dsl",
+      "tracked": true,
+      "sha256": "7367671fdccc2cf55746ef56a9f5888a932e97e941f7a5586549b3cf746b4994",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Outlaw all multiply and divide instructions (RV32M extension)\n\n# Outlaw specific patterns\n# Example: Outlaw ADD when destination is x0 (NOP-like behavior)\n\n# Low-level pattern example\n# pattern 0x00000013 mask 0xFFFFFFFF  # ADDI x0, x0, 0 (canonical NOP)\n"
+    },
+    "PdatDsl/examples/restrict_branch_alignment.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/restrict_branch_alignment.dsl",
+      "tracked": true,
+      "sha256": "d67f0dc9a77fbdbf0cd8d582a3d1a365d19adba1d43b3a1c19850369551f79f9",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example: Restrict branch offsets to specific alignments\n# Demonstrates bit patterns on branch instructions\n\nrequire RV32I\n\n# Branch instructions use B-type format with split immediates\n# The immediate represents a 13-bit signed offset in multiples of 2\n# For this example, we'll use simplified pattern matching\n\n# Note: B-type instructions have complex split immediate encoding:\n# imm[12|10:5] in bits [31:25], imm[4:1|11] in bits [11:7]\n# Full implementation would require handling split fields\n\n# For demonstration purposes, if we had unified 'offset' field:\n# Restrict to 4-byte aligned branches (lower 2 bits = 00)\n# instruction BEQ { offset = 13'bxxxxxxxxxxx00 }\n\n# This is a design note - split immediate handling is a future enhancement\n# Current implementation works best with unified immediate fields like in I-type\n"
+    },
+    "PdatDsl/examples/restrict_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/restrict_shifts.dsl",
+      "tracked": true,
+      "sha256": "3ffbfe82d5bd6a67c8492837273fba895b4d908ea91b589aef746ee249313f6a",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example: Restrict shift instructions to small shift amounts\n# This demonstrates using bit patterns to constrain immediate field values\n\n# Specify valid instruction set\nrequire RV32I\n\n# Restrict SLLI (logical left shift immediate) to shifts by 0-3 only\n# RV32 shift instructions use I-type format with a 12-bit immediate field\n# For shifts, bits [31:25] are funct7 (fixed), bits [24:20] are the 5-bit shift amount\n# The 'imm' field in the encoding is 12 bits, so we need to specify all 12 bits\n# Pattern: 0000000 (7 bits funct7 for SLLI) + 000xx (5 bits shamt 0-3)\n\n# SLLI: funct7=0x00 (0000000), shamt=0-3\ninstruction SLLI { imm = 12'b000000000000 }  # Forbid shift by 0\ninstruction SLLI { imm = 12'b000000000001 }  # Forbid shift by 1\ninstruction SLLI { imm = 12'b000000000010 }  # Forbid shift by 2\ninstruction SLLI { imm = 12'b000000000011 }  # Forbid shift by 3\n\n# SRLI: funct7=0x00 (0000000), shamt=0-3\ninstruction SRLI { imm = 12'b000000000000 }  # Forbid shift by 0\ninstruction SRLI { imm = 12'b000000000001 }  # Forbid shift by 1\ninstruction SRLI { imm = 12'b000000000010 }  # Forbid shift by 2\ninstruction SRLI { imm = 12'b000000000011 }  # Forbid shift by 3\n\n# SRAI: funct7=0x20 (0100000), shamt=0-3\ninstruction SRAI { imm = 12'b010000000000 }  # Forbid shift by 0\ninstruction SRAI { imm = 12'b010000000001 }  # Forbid shift by 1\ninstruction SRAI { imm = 12'b010000000010 }  # Forbid shift by 2\ninstruction SRAI { imm = 12'b010000000011 }  # Forbid shift by 3\n\n# Note: In an outlawing framework, these rules forbid shifts by amounts 0-3\n# All other shift amounts (4-31) remain allowed\n#\n# To ALLOW only shifts 0-3 and forbid all others, use the 'allow' keyword:\n# allow instruction SLLI { imm = 12'b00000000000x }  # Allow shifts 0-1\n# (The 'allow' keyword inverts the semantics - not yet fully implemented)\n"
+    },
+    "PdatDsl/examples/restrict_single_shift.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/restrict_single_shift.dsl",
+      "tracked": true,
+      "sha256": "723b022bac90c8577154235d5c2e7f18c3acbf12ed3f4efaf668b3400e4fedd0",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example: Allow only specific shift amounts\n# Demonstrates multiple bit pattern constraints on the same instruction\n\nrequire RV32I\n\n# Allow ONLY shift by 1 (no other shift amounts)\n# These rules collectively forbid all shift amounts except 1\ninstruction SLLI { imm = 5'b00000 }  # Forbid shift by 0\ninstruction SLLI { imm = 5'b00010 }  # Forbid shift by 2\ninstruction SLLI { imm = 5'b00011 }  # Forbid shift by 3\ninstruction SLLI { imm = 5'b001xx }  # Forbid shift by 4-7\ninstruction SLLI { imm = 5'b01xxx }  # Forbid shift by 8-15\ninstruction SLLI { imm = 5'b1xxxx }  # Forbid shift by 16-31\n\n# Result: Only SLLI with imm = 5'b00001 (shift by 1) is allowed\n\n# Note: With the 'allow' keyword, this becomes much simpler:\n# allow instruction SLLI { imm = 5'b00001 }  # Allow ONLY shift by 1\n"
+    },
+    "PdatDsl/examples/rv32i.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32i.dsl",
+      "tracked": false,
+      "sha256": "6d5cd181d9efda74d2d3588d63afc3798c16a4f05c3038a6e58744e86957fd02",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "require RV32I\n"
+    },
+    "PdatDsl/examples/rv32i_timing.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32i_timing.dsl",
+      "tracked": false,
+      "sha256": "b9f990f3ee4ab525516cab502974d8efff6143e8629760fd62bdf380e7c7b425",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "require RV32I\n\ninstr_hit_latency 1\ninstr_miss_latency 5\ndata_hit_latency 1\ndata_miss_latency 4\n"
+    },
+    "PdatDsl/examples/rv32ic.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32ic.dsl",
+      "tracked": true,
+      "sha256": "17ff78615399f6bc9396f14bc715d5e7efbdfcce8ce13ea9c6e551a1645ecb51",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# RV32IC Example - RV32I with Compressed Instructions\n# This demonstrates auto-expansion: when C extension is required,\n# outlawing an instruction like \"MUL\" will also outlaw \"C.MUL\" if it exists.\n\n# Require base instruction set and compressed extension\nrequire RV32I\nrequire RV32C\n\n# Outlaw all M extension instructions\n# Note: Since RV32C is required, this will automatically also outlaw\n# compressed versions if they exist (though M extension doesn't have\n# compressed equivalents, this is just an example)\ninstruction MUL\ninstruction MULH\ninstruction MULHSU\ninstruction MULHU\ninstruction DIV\ninstruction DIVU\ninstruction REM\ninstruction REMU\n\n# You can also explicitly outlaw specific compressed instructions\n# instruction C.ADD\n# instruction C.MV\n\n# Example: constrain register usage\n# require_registers x0-x15\n"
+    },
+    "PdatDsl/examples/rv32im.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im.dsl",
+      "tracked": true,
+      "sha256": "4c42b042e5c26a12ec75da6bccac2fd9b04a896df7add22bddd1b06c08d92b61",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "require RV32I\nrequire RV32M\n"
+    },
+    "PdatDsl/examples/rv32im_64kb.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_64kb.dsl",
+      "tracked": true,
+      "sha256": "bc8dc0f2f19a17589ff80d0b71337158cc9aa47feb24a9f8603412aa91606e46",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# RV32IM with 64KB instruction memory constraint\n# This example demonstrates using require_pc_bits to restrict the PC\n# to a limited address space (useful for formal verification and synthesis)\n\n# Require base instruction sets\nrequire RV32I\nrequire RV32M\n\n# Constrain PC to 16 bits (64KB address space)\n# This forces PC[31:16] to be zero, limiting instruction memory to first 64KB\nrequire_pc_bits 16\n\n# Optionally outlaw specific instructions\n# instruction DIV\n# instruction REM\n"
+    },
+    "PdatDsl/examples/rv32im_narrow16.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_narrow16.dsl",
+      "tracked": true,
+      "sha256": "9f0e97ef10f502368f0d948764f54591ec1fff39866f2ab21270e54b2b188238",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# RV32IM with 16-bit maximum data width constraint\n# This restricts ALL arithmetic instructions to operate only on 8-bit and 16-bit data types\n# Useful for reducing hardware area by implementing only narrow multipliers/ALUs\n\n# Require base instruction sets\nrequire RV32I\nrequire RV32M\n\n# ============================================================================\n# Data Type Constraint Strategy\n# ============================================================================\n# Using negated type sets to ALLOW ONLY narrow types (8-bit and 16-bit)\n# This forbids 32-bit operations, enabling:\n# - Smaller multiplier/divider units (16-bit instead of 32-bit)\n# - Reduced ALU area\n# - Synthesis optimization based on narrow operand assumptions\n#\n# Syntax: dtype = ~(i8 | u8 | i16 | u16)\n# Meaning: Allow ONLY these types, forbid everything else (i32, u32, i64, u64)\n\n# ============================================================================\n# RV32M Instructions (Multiply/Divide)\n# ============================================================================\n# These are the primary targets for area reduction\n\ninstruction MUL    { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction MULH   { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction MULHSU { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction MULHU  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction DIV    { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction DIVU   { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction REM    { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction REMU   { dtype = ~(i8 | u8 | i16 | u16) }\n\n# ============================================================================\n# RV32I ALU Instructions (Register-Register)\n# ============================================================================\n\ninstruction ADD  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction SUB  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction SLL  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction SRL  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction SRA  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction SLT  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction SLTU { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction XOR  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction OR   { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction AND  { dtype = ~(i8 | u8 | i16 | u16) }\n\n# ============================================================================\n# RV32I ALU-Immediate Instructions\n# ============================================================================\n\ninstruction ADDI  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction SLTI  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction SLTIU { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction XORI  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction ORI   { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction ANDI  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction SLLI  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction SRLI  { dtype = ~(i8 | u8 | i16 | u16) }\ninstruction SRAI  { dtype = ~(i8 | u8 | i16 | u16) }\n\n# ============================================================================\n# Expected Hardware Benefits\n# ============================================================================\n# - Multiplier: 16x16 instead of 32x32 (approximately 4x area reduction)\n# - Divider: 16-bit instead of 32-bit (significant area/timing improvement)\n# - ALU: Can optimize assuming upper 16 bits are sign/zero extended\n# - Register file: Upper bits may be optimized away in some paths\n#\n# For formal verification:\n# - Reduced state space (operands bounded to 16 bits)\n# - Faster convergence of proofs\n# - Can prove properties about narrow arithmetic\n"
+    },
+    "PdatDsl/examples/rv32im_narrow8.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_narrow8.dsl",
+      "tracked": true,
+      "sha256": "c0eeaccf5218e0a8d35bf070dd9d54e73f5c8b1e47cca3a7761130b123045686",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# RV32IM with 8-bit maximum data width constraint\n# This restricts ALL arithmetic instructions to operate only on 8-bit data types\n# Useful for minimal hardware implementations (8-bit microcontrollers, embedded systems)\n\n# Require base instruction sets\nrequire RV32I\nrequire RV32M\n\n# ============================================================================\n# Data Type Constraint Strategy\n# ============================================================================\n# Using negated type sets to ALLOW ONLY 8-bit types\n# This forbids 16-bit and 32-bit operations, enabling:\n# - Minimal multiplier/divider units (8-bit only)\n# - Smallest possible ALU area\n# - Maximum synthesis optimization based on 8-bit operand assumptions\n#\n# Syntax: dtype = ~(i8 | u8)\n# Meaning: Allow ONLY these types, forbid everything else (i16, u16, i32, u32, i64, u64)\n\n# ============================================================================\n# RV32M Instructions (Multiply/Divide)\n# ============================================================================\n# 8-bit multiplier: 8x8=16 bit result (vs 32x32=64 bit)\n# Area reduction: approximately 16x smaller than 32-bit multiplier\n\ninstruction MUL    { dtype = ~(i8 | u8) }\ninstruction MULH   { dtype = ~(i8 | u8) }\ninstruction MULHSU { dtype = ~(i8 | u8) }\ninstruction MULHU  { dtype = ~(i8 | u8) }\ninstruction DIV    { dtype = ~(i8 | u8) }\ninstruction DIVU   { dtype = ~(i8 | u8) }\ninstruction REM    { dtype = ~(i8 | u8) }\ninstruction REMU   { dtype = ~(i8 | u8) }\n\n# ============================================================================\n# RV32I ALU Instructions (Register-Register)\n# ============================================================================\n\ninstruction ADD  { dtype = ~(i8 | u8) }\ninstruction SUB  { dtype = ~(i8 | u8) }\ninstruction SLL  { dtype = ~(i8 | u8) }\ninstruction SRL  { dtype = ~(i8 | u8) }\ninstruction SRA  { dtype = ~(i8 | u8) }\ninstruction SLT  { dtype = ~(i8 | u8) }\ninstruction SLTU { dtype = ~(i8 | u8) }\ninstruction XOR  { dtype = ~(i8 | u8) }\ninstruction OR   { dtype = ~(i8 | u8) }\ninstruction AND  { dtype = ~(i8 | u8) }\n\n# ============================================================================\n# RV32I ALU-Immediate Instructions\n# ============================================================================\n\ninstruction ADDI  { dtype = ~(i8 | u8) }\ninstruction SLTI  { dtype = ~(i8 | u8) }\ninstruction SLTIU { dtype = ~(i8 | u8) }\ninstruction XORI  { dtype = ~(i8 | u8) }\ninstruction ORI   { dtype = ~(i8 | u8) }\ninstruction ANDI  { dtype = ~(i8 | u8) }\ninstruction SLLI  { dtype = ~(i8 | u8) }\ninstruction SRLI  { dtype = ~(i8 | u8) }\ninstruction SRAI  { dtype = ~(i8 | u8) }\n\n# ============================================================================\n# Expected Hardware Benefits\n# ============================================================================\n# Compared to full 32-bit implementation:\n# - Multiplier: 8x8 instead of 32x32 (approximately 16x area reduction)\n# - Divider: 8-bit instead of 32-bit (major area/timing improvement)\n# - ALU: Can optimize assuming upper 24 bits are sign/zero extended\n# - Overall: Suitable for ultra-low-area embedded microcontrollers\n#\n# Compared to 16-bit configuration (rv32im_narrow16.dsl):\n# - Multiplier: 8x8 instead of 16x16 (approximately 4x additional reduction)\n# - Total area savings: ~60-70% vs narrow16, ~90-95% vs full 32-bit\n#\n# Use cases:\n# - 8-bit sensor nodes\n# - Minimal RISC-V implementations\n# - Power-constrained embedded systems\n# - Formal verification with minimal state space\n"
+    },
+    "PdatDsl/examples/rv32im_no_mul.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_no_mul.dsl",
+      "tracked": false,
+      "sha256": "ce5930d6e33079b48e9e7bd6fcb106741791cee84faa74b079f5247d1f29a521",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "require RV32I\nrequire RV32M\n\ninstruction MUL\ninstruction MULH\ninstruction MULHSU\ninstruction MULHU"
+    },
+    "PdatDsl/examples/rv32im_no_mul_timing.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_no_mul_timing.dsl",
+      "tracked": false,
+      "sha256": "d12b2d99764642ab7f153aa9c9f8728640823aed8950ab3f2d6551540d7b4752",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "require RV32I\nrequire RV32M\n\ninstruction MUL\ninstruction MULH\ninstruction MULHSU\ninstruction MULHU\n\ninstr_hit_latency 1\ninstr_miss_latency 5\ndata_hit_latency 1\ndata_miss_latency 4\n"
+    },
+    "PdatDsl/examples/rv32im_timing.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_timing.dsl",
+      "tracked": true,
+      "sha256": "30e8569f7682f633e24790899bd54d24c05d11c55e5b0feb3e9d4fe8e3ef0639",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "require RV32I\nrequire RV32M\n\ninstr_hit_latency 1\ninstr_miss_latency 5\ndata_hit_latency 1\ndata_miss_latency 4\n"
+    },
+    "PdatDsl/examples/rv32im_timing_strict.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/rv32im_timing_strict.dsl",
+      "tracked": true,
+      "sha256": "7833bb30762902b16ecafdcd041f76fa118bb775cfa084d56d678694d7dee948",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "require RV32I\nrequire RV32M\n\ninstr_hit_latency 1\ninstr_miss_latency 2\ndata_hit_latency 1\ndata_miss_latency 2\n"
+    },
+    "PdatDsl/examples/v2_allow_slli_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_allow_slli_shifts.dsl",
+      "tracked": true,
+      "sha256": "bd93541c22443ef37889685d9393d81a31f111d89a82bed4d1377e4e8a460f27",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "version 2\n\n# Example: Allow ONLY SLLI with shift amounts 0-3\n# This demonstrates the clean v2 syntax for your original use case\n\n# Include only the specific SLLI patterns we want\ninclude SLLI {shamt = 5'b00000}  # shift by 0\ninclude SLLI {shamt = 5'b00001}  # shift by 1\ninclude SLLI {shamt = 5'b00010}  # shift by 2\ninclude SLLI {shamt = 5'b00011}  # shift by 3\n\n# Result: Only these 4 SLLI variants are allowed\n# All other instructions (including SLLI with shamt 4-31) are forbidden\n"
+    },
+    "PdatDsl/examples/v2_minimal_isa.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_minimal_isa.dsl",
+      "tracked": true,
+      "sha256": "b246b310352b796fe83717db2028348c0d9619b94128fa8016dfd3d07db3072b",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "version 2\n\n# Example: Build a minimal ISA from scratch\n# Start from empty set and add only what we need\n\n# Add only the instructions we need\ninclude ADD\ninclude ADDI\ninclude LW\ninclude SW\ninclude BEQ\ninclude JAL\n\n# Further restrict: ADDI only with small immediates\nforbid ADDI\ninclude ADDI {imm = 12'b000000000000}  # imm=0\ninclude ADDI {imm = 12'b000000000001}  # imm=1\ninclude ADDI {imm = 12'b000000000010}  # imm=2\ninclude ADDI {imm = 12'b000000000011}  # imm=3\ninclude ADDI {imm = 12'b000000000100}  # imm=4\n\n# Result: Tiny ISA with 10 instruction variants\n# - 1 ADD (all variants)\n# - 5 ADDI (with imm 0-4)\n# - 1 LW, 1 SW, 1 BEQ, 1 JAL\n"
+    },
+    "PdatDsl/examples/v2_register_ranges.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_register_ranges.dsl",
+      "tracked": true,
+      "sha256": "1f1a4557f801ff5732409c283b8cf7fdf9e558da27d69ee4f7f8b86ee2e0d1ac",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "version 2\n\n# Example: Limit specific instruction to use only low registers\n# Demonstrates range constraints with BDD optimization\n\n# Include only ADD with rd in x0-x15\ninclude ADD {rd in x0-x15}\n\n# Include only SUB with both operands in x0-x15\ninclude SUB {rd in x0-x15, rs1 in x0-x15, rs2 in x0-x15}\n\n# Result: Very compact SystemVerilog with just 2 patterns\n# BDD automatically optimizes to check high bits instead of enumerating all combinations\n"
+    },
+    "PdatDsl/examples/v2_rv32i_no_mul.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_rv32i_no_mul.dsl",
+      "tracked": true,
+      "sha256": "a9e1a459482abcc5e800ddf17ecb23c79e4bad86fbfd72a7b8c33a80fd0eacff",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "version 2\n\n# Example: RV32I without multiplication (v2 syntax)\n# Equivalent to v1: require RV32I; require RV32M; instruction MUL; ...\n\ninclude RV32I\ninclude RV32M\n\n# Remove all multiplication instructions\nforbid MUL\nforbid MULH\nforbid MULHSU\nforbid MULHU\nforbid DIV\nforbid DIVU\nforbid REM\nforbid REMU\n\n# Result: RV32I + RV32M minus all M-extension instructions = RV32I only\n"
+    },
+    "PdatDsl/examples/v2_rv32i_restricted_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_rv32i_restricted_shifts.dsl",
+      "tracked": true,
+      "sha256": "7b5a22df5f3d899f4b4522ae0e1256ca21a7374ded354ad09d98c33f8324e7ca",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "version 2\n\n# Example: Full RV32I but with restricted shift amounts\n# Demonstrates sequential include/forbid operations\n\n# Start with full RV32I instruction set\ninclude RV32I\n\n# Remove all shift instructions\nforbid SLLI\nforbid SRLI\nforbid SRAI\n\n# Add back only shifts with amount 0-7 (3-bit shifts)\ninclude SLLI {shamt = 5'b00000}\ninclude SLLI {shamt = 5'b00001}\ninclude SLLI {shamt = 5'b00010}\ninclude SLLI {shamt = 5'b00011}\ninclude SLLI {shamt = 5'b00100}\ninclude SLLI {shamt = 5'b00101}\ninclude SLLI {shamt = 5'b00110}\ninclude SLLI {shamt = 5'b00111}\n\ninclude SRLI {shamt = 5'b00000}\ninclude SRLI {shamt = 5'b00001}\ninclude SRLI {shamt = 5'b00010}\ninclude SRLI {shamt = 5'b00011}\ninclude SRLI {shamt = 5'b00100}\ninclude SRLI {shamt = 5'b00101}\ninclude SRLI {shamt = 5'b00110}\ninclude SRLI {shamt = 5'b00111}\n\ninclude SRAI {shamt = 5'b00000}\ninclude SRAI {shamt = 5'b00001}\ninclude SRAI {shamt = 5'b00010}\ninclude SRAI {shamt = 5'b00011}\ninclude SRAI {shamt = 5'b00100}\ninclude SRAI {shamt = 5'b00101}\ninclude SRAI {shamt = 5'b00110}\ninclude SRAI {shamt = 5'b00111}\n\n# Result: Full RV32I with all shift instructions limited to 3-bit shift amounts (0-7)\n# Upper 2 bits of shift amount are constrained to 00\n\ninstr_hit_latency 1\ninstr_miss_latency 5\ndata_hit_latency 1\ndata_miss_latency 4"
+    },
+    "PdatDsl/examples/v2_sequential_demo.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_sequential_demo.dsl",
+      "tracked": true,
+      "sha256": "5998270b0f3054d382eb6329d6d051a68b1a72e679b92eda92e0877f2588641b",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "version 2\n\n# Example: Demonstrating sequential semantics\n# This shows how order matters in v2\n\n# Include full RV32I (40 instructions)\ninclude RV32I\n\n# Remove ADD instruction\nforbid ADD\n\n# Add back ADD, but only with rd=x0 (effectively NOP)\ninclude ADD {rd = x0}\n\n# Remove ADDI\nforbid ADDI\n\n# Add back ADDI with specific immediates\ninclude ADDI {imm = 12'b000000000001}  # ADDI with imm=1\ninclude ADDI {imm = 12'b000000000010}  # ADDI with imm=2\ninclude ADDI {imm = 12'b000000000100}  # ADDI with imm=4\n\n# Result:\n# - RV32I base set\n# - ADD only allowed when rd=x0\n# - ADDI only allowed with imm \u2208 {1, 2, 4}\n# - All other instructions unchanged\n"
+    },
+    "PdatDsl/examples/v2_your_use_case.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/examples/v2_your_use_case.dsl",
+      "tracked": true,
+      "sha256": "e8e02db67b79c99b0380b97e87b236d0144f2238c67069b379b63b8d71b47855",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "version 2\n\n# Your original request: \"restrict shift instructions to only shift by certain numbers\"\n# Using 5-bit quad-state logic: 5'b00xx restricts to shifts 0-3\n\n# This is the exact use case you described!\n\n# Allow ONLY SLLI with shift amounts 0-3 (5'b00xx pattern)\ninclude SLLI {shamt = 5'b00000}  # 5'b00xx matches 0\ninclude SLLI {shamt = 5'b00001}  # 5'b00xx matches 1\ninclude SLLI {shamt = 5'b00010}  # 5'b00xx matches 2\ninclude SLLI {shamt = 5'b00011}  # 5'b00xx matches 3\n\n# This generates a positive assertion in SystemVerilog:\n# assume (instruction is one of these 4 SLLI variants)\n#\n# All SLLI with shamt 4-31 are forbidden (not in the allowed set)\n"
+    },
+    "PdatDsl/workload/baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/baseline.dsl",
+      "tracked": true,
+      "sha256": "7367671fdccc2cf55746ef56a9f5888a932e97e941f7a5586549b3cf746b4994",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Outlaw all multiply and divide instructions (RV32M extension)\n\n# Outlaw specific patterns\n# Example: Outlaw ADD when destination is x0 (NOP-like behavior)\n\n# Low-level pattern example\n# pattern 0x00000013 mask 0xFFFFFFFF  # ADDI x0, x0, 0 (canonical NOP)\n"
+    },
+    "PdatDsl/workload/rv32i_no_add_addi.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32i_no_add_addi.dsl",
+      "tracked": true,
+      "sha256": "ea40547cd0a23c6b6a4d6518945d78eea4708c4aa7a6771ace867b86b71d3b38",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Specify which instruction extensions are valid (positive constraints)\n# This tells the optimizer that ONLY instructions from these extensions are valid\nrequire RV32I\n\n# Outlaw ADD and ADDI instructions (addition instructions from RV32I extension)\n# Even though RV32I is required above, these specific addition instructions are outlawed\ninstruction ADD\ninstruction ADDI\n"
+    },
+    "PdatDsl/workload/rv32im.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im.dsl",
+      "tracked": true,
+      "sha256": "4c42b042e5c26a12ec75da6bccac2fd9b04a896df7add22bddd1b06c08d92b61",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "require RV32I\nrequire RV32M\n"
+    },
+    "PdatDsl/workload/rv32im_no_XOR.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_XOR.dsl",
+      "tracked": true,
+      "sha256": "0cb8702b495f432f3231531a757ccb13d1ec5c12d9a3b83cfdc60fe692507a9b",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Specify which instruction extensions are valid (positive constraints)\n# This tells the optimizer that ONLY instructions from these extensions are valid\nrequire RV32I\nrequire RV32M\n\n# Outlaw the XOR instruction (RV32I extension)\n# Even though RV32I is required above, this specific instruction is outlawed\ninstruction XOR\n"
+    },
+    "PdatDsl/workload/rv32im_no_add.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_add.dsl",
+      "tracked": true,
+      "sha256": "4af95393c2fbe5068e7923785817f42dfc58ece959c8607d1c16c18b1fe54ae7",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Specify which instruction extensions are valid (positive constraints)\n# This tells the optimizer that ONLY instructions from these extensions are valid\nrequire RV32I\nrequire RV32M\n\n# Outlaw the ADD instruction (from RV32I extension)\n# Even though RV32M is required above, the ADD instruction is outlawed as an example\ninstruction ADD\n"
+    },
+    "PdatDsl/workload/rv32im_no_add_addi.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_add_addi.dsl",
+      "tracked": true,
+      "sha256": "a6206554c51c2ee69bcf6fa0b8fe07f80ee04871118d95691cb7be9d8cf5b1be",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Specify which instruction extensions are valid (positive constraints)\n# This tells the optimizer that ONLY instructions from these extensions are valid\nrequire RV32I\nrequire RV32M\n\n# Outlaw ADD and ADDI instructions (addition instructions from RV32I extension)\n# Even though RV32I is required above, these specific addition instructions are outlawed\ninstruction ADD\ninstruction ADDI\n"
+    },
+    "PdatDsl/workload/rv32im_no_add_sub.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_add_sub.dsl",
+      "tracked": true,
+      "sha256": "ff1c9e83e5836685f18cf0bb1a1615db5eb32b47cd958295bfcd8b6508972574",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Specify which instruction extensions are valid (positive constraints)\n# This tells the optimizer that ONLY instructions from these extensions are valid\nrequire RV32I\nrequire RV32M\n\n# Outlaw ADD and SUB instructions (RV32I extension)\n# Even though RV32I is required above, these specific instructions are outlawed\ninstruction ADD\ninstruction SUB\n"
+    },
+    "PdatDsl/workload/rv32im_no_bq.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_bq.dsl",
+      "tracked": true,
+      "sha256": "5d2aefd2777fff32cc6d4182d97f96f9fcd3c9968b742955a5dc3f120fb10fd1",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Specify which instruction extensions are valid (positive constraints)\n# This tells the optimizer that ONLY instructions from these extensions are valid\nrequire RV32I\nrequire RV32M\n\n# Outlaw all branch instructions (BNE, BLT, BGE, BLTU, BGEU)\n# Even though RV32I is required above, these specific branch instructions are outlawed\ninstruction BNE\ninstruction BLT\ninstruction BGE\ninstruction BLTU\ninstruction BGEU\n"
+    },
+    "PdatDsl/workload/rv32im_no_div.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_div.dsl",
+      "tracked": true,
+      "sha256": "0f4af891e25ed67526b5febce8a96f33b6686fac501128d397d9bfa39d6f0d82",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Specify which instruction extensions are valid (positive constraints)\n# This tells the optimizer that ONLY instructions from these extensions are valid\nrequire RV32I\nrequire RV32M\n\n# Outlaw all multiply and divide instructions (RV32M extension)\n# Even though RV32M is required above, these specific instructions are outlawed\ninstruction DIV\ninstruction DIVU\n\n"
+    },
+    "PdatDsl/workload/rv32im_no_mul.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_mul.dsl",
+      "tracked": true,
+      "sha256": "f5af1fdbf29115493c52c16ea0f51b53454021b255c087b0ee4ff0d6bf14d187",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Specify which instruction extensions are valid (positive constraints)\n# This tells the optimizer that ONLY instructions from these extensions are valid\nrequire RV32I\nrequire RV32M\n\n# Outlaw all multiply and divide instructions (RV32M extension)\n# Even though RV32M is required above, these specific instructions are outlawed\ninstruction MUL\ninstruction MULH\ninstruction MULHSU\ninstruction MULHU\n"
+    },
+    "PdatDsl/workload/rv32im_no_mul_no_div.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_mul_no_div.dsl",
+      "tracked": true,
+      "sha256": "085f2903cdc4e860a8245d31b04174d18276f4601faf1db3528efaea1cc314e3",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Specify which instruction extensions are valid (positive constraints)\n# This tells the optimizer that ONLY instructions from these extensions are valid\nrequire RV32I\nrequire RV32M\n\n# Outlaw all multiply and divide instructions (RV32M extension)\n# Even though RV32M is required above, these specific instructions are outlawed\ninstruction MUL\ninstruction MULH\ninstruction MULHSU\ninstruction MULHU\ninstruction DIV\ninstruction DIVU\n"
+    },
+    "PdatDsl/workload/rv32im_no_mul_no_div_no_rem.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_mul_no_div_no_rem.dsl",
+      "tracked": true,
+      "sha256": "bb8373d0abf2f3915b014134b56e1ed7e376a2660d12399dd26d31b494a19332",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Specify which instruction extensions are valid (positive constraints)\n# This tells the optimizer that ONLY instructions from these extensions are valid\nrequire RV32I\nrequire RV32M\n\n# Outlaw all multiply and divide instructions (RV32M extension)\n# Even though RV32M is required above, these specific instructions are outlawed\ninstruction MUL\ninstruction MULH\ninstruction MULHSU\ninstruction MULHU\ninstruction DIV\ninstruction DIVU\ninstruction REM\ninstruction REMU\n\n"
+    },
+    "PdatDsl/workload/rv32im_no_sub.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/rv32im_no_sub.dsl",
+      "tracked": true,
+      "sha256": "0f39ee1656efe1d185e0e8637b6360b19cac2640e630bdf64fc050a8b648a58b",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "# Example outlawed instruction specification\n\n# Specify which instruction extensions are valid (positive constraints)\n# This tells the optimizer that ONLY instructions from these extensions are valid\nrequire RV32I\nrequire RV32M\n\n# Outlaw the SUB instruction (from RV32I extension)\n# Even though RV32I is required above, the SUB instruction is specifically outlawed\ninstruction SUB\n"
+    },
+    "PdatDsl/workload/v2_rv32i_restricted_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/PdatDsl/workload/v2_rv32i_restricted_shifts.dsl",
+      "tracked": true,
+      "sha256": "632f24c09c2657eff5f3d732d3da2b11a650d508f9c90e4ebe8c27ebc08f485f",
+      "repository_head": "3fe0d81f0d8a2fed326fbd1d4095b1bd9f3b594a",
+      "source_text": "version 2\n\n# Example: Full RV32I but with restricted shift amounts\n# Demonstrates sequential include/forbid operations\n\n# Start with full RV32I instruction set\ninclude RV32I\n\n# Remove all shift instructions\nforbid SLLI\nforbid SRLI\nforbid SRAI\n\n# Add back only shifts with amount 0-7 (3-bit shifts)\ninclude SLLI {shamt = 5'b00000}\ninclude SLLI {shamt = 5'b00001}\ninclude SLLI {shamt = 5'b00010}\ninclude SLLI {shamt = 5'b00011}\ninclude SLLI {shamt = 5'b00100}\ninclude SLLI {shamt = 5'b00101}\ninclude SLLI {shamt = 5'b00110}\ninclude SLLI {shamt = 5'b00111}\n\ninclude SRLI {shamt = 5'b00000}\ninclude SRLI {shamt = 5'b00001}\ninclude SRLI {shamt = 5'b00010}\ninclude SRLI {shamt = 5'b00011}\ninclude SRLI {shamt = 5'b00100}\ninclude SRLI {shamt = 5'b00101}\ninclude SRLI {shamt = 5'b00110}\ninclude SRLI {shamt = 5'b00111}\n\ninclude SRAI {shamt = 5'b00000}\ninclude SRAI {shamt = 5'b00001}\ninclude SRAI {shamt = 5'b00010}\ninclude SRAI {shamt = 5'b00011}\ninclude SRAI {shamt = 5'b00100}\ninclude SRAI {shamt = 5'b00101}\ninclude SRAI {shamt = 5'b00110}\ninclude SRAI {shamt = 5'b00111}\n\n# Result: Full RV32I with all shift instructions limited to 3-bit shift amounts (0-7)\n# Upper 2 bits of shift amount are constrained to 00\n\n"
+    },
+    "ScorrPdat/examples/shifts/baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/examples/shifts/baseline.dsl",
+      "tracked": true,
+      "sha256": "0ecf23968555a47be71730507a492f7d060ff98eceee1e0934da517dc4706895",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "version 2\n\ninclude RV32I\nforbid SLL\nforbid SLLI\nforbid SRL\nforbid SRLI\nforbid SRA\nforbid SRAI\n"
+    },
+    "ScorrPdat/examples/shifts/slli.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/examples/shifts/slli.dsl",
+      "tracked": true,
+      "sha256": "0fd7081a81d52a711aceff2e6553e4aa1a9b1b457796348ebc29ab4318d212ee",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "version 2\n\ninclude RV32I\nforbid SLL\nforbid SRL\nforbid SRLI\nforbid SRA\nforbid SRAI\n"
+    },
+    "ScorrPdat/examples/shifts/slli2.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/examples/shifts/slli2.dsl",
+      "tracked": true,
+      "sha256": "f4c6ea966fd282211c193ceafb8bfab3fbece3e9e4737dea151294c512a73b39",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "version 2\n\ninclude RV32I\nforbid SLL\nforbid SLLI\nforbid SRL\nforbid SRLI\nforbid SRA\nforbid SRAI\ninclude SLLI {shamt = 5'b00001}\n\n"
+    },
+    "ScorrPdat/experiments/reg_count/04regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/experiments/reg_count/04regs.dsl",
+      "tracked": true,
+      "sha256": "a3bee707ac3fbaf9a84bd69abdee69861388f0af359af09114f6d46b31c59efe",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "version 2\n\n# RV32I with only 4 registers: x0-x3\ninclude RV32I\nforbid x4-x31\n"
+    },
+    "ScorrPdat/experiments/reg_count/08regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/experiments/reg_count/08regs.dsl",
+      "tracked": true,
+      "sha256": "a2399567856e6d440562799f144f878932db4fff5aaf368a6df86480aa1e663a",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "version 2\n\n# RV32I with only 8 registers: x0-x7\ninclude RV32I\nforbid x8-x31\n"
+    },
+    "ScorrPdat/experiments/reg_count/16regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/experiments/reg_count/16regs.dsl",
+      "tracked": true,
+      "sha256": "f5df2a8fb0fec5f4dc35ef2e8418d2c2efbe48df74146cc9213548b1309b45d6",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "version 2\n\n# RV32I with only 16 registers: x0-x15 (RV32E)\ninclude RV32I\nforbid x16-x31\n"
+    },
+    "ScorrPdat/experiments/reg_count/32regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/experiments/reg_count/32regs.dsl",
+      "tracked": true,
+      "sha256": "b6d65a83105fe837ab657d7c09d534d88ceaa8a753a601d45bd90aebd76164d7",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "version 2\n\n# RV32I with all 32 registers: x0-x31 (baseline)\ninclude RV32I\n"
+    },
+    "ScorrPdat/tests/regression/fixtures/baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/baseline.dsl",
+      "tracked": true,
+      "sha256": "545ba551d46cc40714fc69459669456be6948f6f7f1506c68c564860c9ee9c28",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "# Baseline RV32I - Minimal test fixture for regression tests\n# This is a simple baseline with no constraints, used to verify the synthesis flow\n\nrequire RV32I\n"
+    },
+    "ScorrPdat/tests/regression/fixtures/odc_power_of_2_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/odc_power_of_2_shifts.dsl",
+      "tracked": true,
+      "sha256": "e05c7ed2f89aa85d42776cbca5124196adcb48d07ff21ce9f7c8f1ca0937a026",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "# ODC test fixture: Shifts with power-of-2 amounts (0, 1, 2, 4, 8)\n# Expected: Bits [4:3] should be constant 0 (max shift is 8 = 0b01000)\n\nversion 2\n\ninclude RV32I\nforbid SLLI\nforbid SRLI\nforbid SRAI\n\n# Power-of-2 shift amounts\ninclude SLLI {shamt = 5'b00000}  # 0\ninclude SLLI {shamt = 5'b00001}  # 1\ninclude SLLI {shamt = 5'b00010}  # 2\ninclude SLLI {shamt = 5'b00100}  # 4\ninclude SLLI {shamt = 5'b01000}  # 8\n\n# Expected ODCs:\n# - shamt[4] = 0 (max value is 8, so bit 4 never set)\n# - shamt[3] = varies (set for shamt=8, not for others) - NOT an ODC\n# - shamt[2:0] = varies - NOT ODCs\n"
+    },
+    "ScorrPdat/tests/regression/fixtures/odc_single_shift.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/odc_single_shift.dsl",
+      "tracked": true,
+      "sha256": "af177d3f15cb41513f4ad11093334318c818abd6e99f344067ed38094bb6d474",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "# ODC test fixture: Only one shift instruction allowed\n# Expected: All 5 shamt bits should be constant (and thus ODCs)\n\nversion 2\n\ninclude RV32I\nforbid SLLI\nforbid SRLI\nforbid SRAI\nforbid SLL\nforbid SRL\nforbid SRA\n\n# Only allow SLLI with shamt=2 (binary: 00010)\ninclude SLLI {shamt = 5'b00010}\n\n# Expected ODCs:\n# - shamt[4] = 0\n# - shamt[3] = 0  \n# - shamt[2] = 0\n# - shamt[1] = 1\n# - shamt[0] = 0\n"
+    },
+    "ScorrPdat/tests/regression/fixtures/simple_outlawed.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/simple_outlawed.dsl",
+      "tracked": true,
+      "sha256": "037d0962159fb37556b098ad88ee9b844e42e656a75a6c6cd93818be380ea415",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "# Simple constraint test fixture\n# Tests basic instruction constraint functionality\n\nrequire RV32I\nrequire RV32M\n\n# Apply data type constraints to test constraint generation\ninstruction MUL { dtype = ~(i8 | i16) }\ninstruction DIV { dtype = ~(i8 | i16) }\n"
+    },
+    "ScorrPdat/tests/regression/fixtures/v2_baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/v2_baseline.dsl",
+      "tracked": true,
+      "sha256": "1f57f75d4d1923b87538657a85c7739a6ff28a0e7920454eab5a235ac6eef379",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "# V2 Baseline - Simple RV32I using v2 syntax\n# Tests basic v2 include functionality\n\nversion 2\n\ninclude RV32I\n"
+    },
+    "ScorrPdat/tests/regression/fixtures/v2_bitpattern_imm.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/v2_bitpattern_imm.dsl",
+      "tracked": true,
+      "sha256": "8547ef5dba301aa5533072aa4369c1b1e469826e37cd332c962b2d049456174b",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "# V2 with bit patterns on immediate fields\n# Tests 12-bit immediate patterns\n\nversion 2\n\ninclude ADDI {imm = 12'b000000000000}  # imm=0\ninclude ADDI {imm = 12'b000000000001}  # imm=1\ninclude ADDI {imm = 12'b000000000010}  # imm=2\ninclude ADDI {imm = 12'b000000000100}  # imm=4\ninclude ADDI {imm = 12'b000000001000}  # imm=8\n"
+    },
+    "ScorrPdat/tests/regression/fixtures/v2_forbid_mul.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/v2_forbid_mul.dsl",
+      "tracked": true,
+      "sha256": "d3ef06a3611369e2052813199f84a0e53ac417106bd68f691f084f578ea07e27",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "# V2 with forbid - RV32I without multiplication\n# Tests v2 forbid functionality\n\nversion 2\n\ninclude RV32I\ninclude RV32M\n\nforbid MUL\nforbid MULH\nforbid MULHSU\nforbid MULHU\nforbid DIV\nforbid DIVU\nforbid REM\nforbid REMU\n"
+    },
+    "ScorrPdat/tests/regression/fixtures/v2_sequential.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/v2_sequential.dsl",
+      "tracked": true,
+      "sha256": "16f25692c2ec531916923080268a6eff6d492c2355d9abd43661497aa7208b60",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "# V2 sequential semantics test\n# Tests that order matters in v2\n\nversion 2\n\ninclude RV32I\nforbid ADD\ninclude ADD {rd = x0}\n\nforbid ADDI\ninclude ADDI {imm = 12'b000000000001}\n"
+    },
+    "ScorrPdat/tests/regression/fixtures/v2_shamt_restrict.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/ScorrPdat/tests/regression/fixtures/v2_shamt_restrict.dsl",
+      "tracked": true,
+      "sha256": "62489117f794f2377f23bb65da1ba01fad14a34761fd2d60a8ef7fba714fbd9b",
+      "repository_head": "e6019dd655317daf8dd15f7151cb99e3181f3f99",
+      "source_text": "# V2 with shamt field - Restrict shift amounts using 5-bit patterns\n# Tests new shamt field and bit pattern constraints\n\nversion 2\n\ninclude RV32I\n\n# Remove all shifts\nforbid SLLI\nforbid SRLI\nforbid SRAI\n\n# Add back only shifts with amount 0-3\ninclude SLLI {shamt = 5'b00000}\ninclude SLLI {shamt = 5'b00001}\ninclude SLLI {shamt = 5'b00010}\ninclude SLLI {shamt = 5'b00011}\n\ninclude SRLI {shamt = 5'b00000}\ninclude SRLI {shamt = 5'b00001}\ninclude SRLI {shamt = 5'b00010}\ninclude SRLI {shamt = 5'b00011}\n\ninclude SRAI {shamt = 5'b00000}\ninclude SRAI {shamt = 5'b00001}\ninclude SRAI {shamt = 5'b00010}\ninclude SRAI {shamt = 5'b00011}\n"
+    },
+    "BoundedDynamicPscorr/examples/shifts/baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/examples/shifts/baseline.dsl",
+      "tracked": true,
+      "sha256": "0ecf23968555a47be71730507a492f7d060ff98eceee1e0934da517dc4706895",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "version 2\n\ninclude RV32I\nforbid SLL\nforbid SLLI\nforbid SRL\nforbid SRLI\nforbid SRA\nforbid SRAI\n"
+    },
+    "BoundedDynamicPscorr/examples/shifts/slli.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/examples/shifts/slli.dsl",
+      "tracked": true,
+      "sha256": "0fd7081a81d52a711aceff2e6553e4aa1a9b1b457796348ebc29ab4318d212ee",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "version 2\n\ninclude RV32I\nforbid SLL\nforbid SRL\nforbid SRLI\nforbid SRA\nforbid SRAI\n"
+    },
+    "BoundedDynamicPscorr/examples/shifts/slli2.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/examples/shifts/slli2.dsl",
+      "tracked": true,
+      "sha256": "f4c6ea966fd282211c193ceafb8bfab3fbece3e9e4737dea151294c512a73b39",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "version 2\n\ninclude RV32I\nforbid SLL\nforbid SLLI\nforbid SRL\nforbid SRLI\nforbid SRA\nforbid SRAI\ninclude SLLI {shamt = 5'b00001}\n\n"
+    },
+    "BoundedDynamicPscorr/experiments/reg_count/04regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/experiments/reg_count/04regs.dsl",
+      "tracked": true,
+      "sha256": "a3bee707ac3fbaf9a84bd69abdee69861388f0af359af09114f6d46b31c59efe",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "version 2\n\n# RV32I with only 4 registers: x0-x3\ninclude RV32I\nforbid x4-x31\n"
+    },
+    "BoundedDynamicPscorr/experiments/reg_count/08regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/experiments/reg_count/08regs.dsl",
+      "tracked": true,
+      "sha256": "a2399567856e6d440562799f144f878932db4fff5aaf368a6df86480aa1e663a",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "version 2\n\n# RV32I with only 8 registers: x0-x7\ninclude RV32I\nforbid x8-x31\n"
+    },
+    "BoundedDynamicPscorr/experiments/reg_count/16regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/experiments/reg_count/16regs.dsl",
+      "tracked": true,
+      "sha256": "f5df2a8fb0fec5f4dc35ef2e8418d2c2efbe48df74146cc9213548b1309b45d6",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "version 2\n\n# RV32I with only 16 registers: x0-x15 (RV32E)\ninclude RV32I\nforbid x16-x31\n"
+    },
+    "BoundedDynamicPscorr/experiments/reg_count/32regs.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/experiments/reg_count/32regs.dsl",
+      "tracked": true,
+      "sha256": "b6d65a83105fe837ab657d7c09d534d88ceaa8a753a601d45bd90aebd76164d7",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "version 2\n\n# RV32I with all 32 registers: x0-x31 (baseline)\ninclude RV32I\n"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/baseline.dsl",
+      "tracked": true,
+      "sha256": "545ba551d46cc40714fc69459669456be6948f6f7f1506c68c564860c9ee9c28",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "# Baseline RV32I - Minimal test fixture for regression tests\n# This is a simple baseline with no constraints, used to verify the synthesis flow\n\nrequire RV32I\n"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/odc_power_of_2_shifts.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/odc_power_of_2_shifts.dsl",
+      "tracked": true,
+      "sha256": "e05c7ed2f89aa85d42776cbca5124196adcb48d07ff21ce9f7c8f1ca0937a026",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "# ODC test fixture: Shifts with power-of-2 amounts (0, 1, 2, 4, 8)\n# Expected: Bits [4:3] should be constant 0 (max shift is 8 = 0b01000)\n\nversion 2\n\ninclude RV32I\nforbid SLLI\nforbid SRLI\nforbid SRAI\n\n# Power-of-2 shift amounts\ninclude SLLI {shamt = 5'b00000}  # 0\ninclude SLLI {shamt = 5'b00001}  # 1\ninclude SLLI {shamt = 5'b00010}  # 2\ninclude SLLI {shamt = 5'b00100}  # 4\ninclude SLLI {shamt = 5'b01000}  # 8\n\n# Expected ODCs:\n# - shamt[4] = 0 (max value is 8, so bit 4 never set)\n# - shamt[3] = varies (set for shamt=8, not for others) - NOT an ODC\n# - shamt[2:0] = varies - NOT ODCs\n"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/odc_single_shift.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/odc_single_shift.dsl",
+      "tracked": true,
+      "sha256": "af177d3f15cb41513f4ad11093334318c818abd6e99f344067ed38094bb6d474",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "# ODC test fixture: Only one shift instruction allowed\n# Expected: All 5 shamt bits should be constant (and thus ODCs)\n\nversion 2\n\ninclude RV32I\nforbid SLLI\nforbid SRLI\nforbid SRAI\nforbid SLL\nforbid SRL\nforbid SRA\n\n# Only allow SLLI with shamt=2 (binary: 00010)\ninclude SLLI {shamt = 5'b00010}\n\n# Expected ODCs:\n# - shamt[4] = 0\n# - shamt[3] = 0  \n# - shamt[2] = 0\n# - shamt[1] = 1\n# - shamt[0] = 0\n"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/simple_outlawed.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/simple_outlawed.dsl",
+      "tracked": true,
+      "sha256": "037d0962159fb37556b098ad88ee9b844e42e656a75a6c6cd93818be380ea415",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "# Simple constraint test fixture\n# Tests basic instruction constraint functionality\n\nrequire RV32I\nrequire RV32M\n\n# Apply data type constraints to test constraint generation\ninstruction MUL { dtype = ~(i8 | i16) }\ninstruction DIV { dtype = ~(i8 | i16) }\n"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/v2_baseline.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/v2_baseline.dsl",
+      "tracked": true,
+      "sha256": "1f57f75d4d1923b87538657a85c7739a6ff28a0e7920454eab5a235ac6eef379",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "# V2 Baseline - Simple RV32I using v2 syntax\n# Tests basic v2 include functionality\n\nversion 2\n\ninclude RV32I\n"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/v2_bitpattern_imm.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/v2_bitpattern_imm.dsl",
+      "tracked": true,
+      "sha256": "8547ef5dba301aa5533072aa4369c1b1e469826e37cd332c962b2d049456174b",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "# V2 with bit patterns on immediate fields\n# Tests 12-bit immediate patterns\n\nversion 2\n\ninclude ADDI {imm = 12'b000000000000}  # imm=0\ninclude ADDI {imm = 12'b000000000001}  # imm=1\ninclude ADDI {imm = 12'b000000000010}  # imm=2\ninclude ADDI {imm = 12'b000000000100}  # imm=4\ninclude ADDI {imm = 12'b000000001000}  # imm=8\n"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/v2_forbid_mul.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/v2_forbid_mul.dsl",
+      "tracked": true,
+      "sha256": "d3ef06a3611369e2052813199f84a0e53ac417106bd68f691f084f578ea07e27",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "# V2 with forbid - RV32I without multiplication\n# Tests v2 forbid functionality\n\nversion 2\n\ninclude RV32I\ninclude RV32M\n\nforbid MUL\nforbid MULH\nforbid MULHSU\nforbid MULHU\nforbid DIV\nforbid DIVU\nforbid REM\nforbid REMU\n"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/v2_sequential.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/v2_sequential.dsl",
+      "tracked": true,
+      "sha256": "16f25692c2ec531916923080268a6eff6d492c2355d9abd43661497aa7208b60",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "# V2 sequential semantics test\n# Tests that order matters in v2\n\nversion 2\n\ninclude RV32I\nforbid ADD\ninclude ADD {rd = x0}\n\nforbid ADDI\ninclude ADDI {imm = 12'b000000000001}\n"
+    },
+    "BoundedDynamicPscorr/tests/regression/fixtures/v2_shamt_restrict.dsl": {
+      "path": "/home/allenjin/Projects/DAC_pscorr/code/PdatProject/BoundedDynamicPscorr/tests/regression/fixtures/v2_shamt_restrict.dsl",
+      "tracked": true,
+      "sha256": "62489117f794f2377f23bb65da1ba01fad14a34761fd2d60a8ef7fba714fbd9b",
+      "repository_head": "26061e5ee3c8ac96ad0b7af0501791dba664c4a8",
+      "source_text": "# V2 with shamt field - Restrict shift amounts using 5-bit patterns\n# Tests new shamt field and bit pattern constraints\n\nversion 2\n\ninclude RV32I\n\n# Remove all shifts\nforbid SLLI\nforbid SRLI\nforbid SRAI\n\n# Add back only shifts with amount 0-3\ninclude SLLI {shamt = 5'b00000}\ninclude SLLI {shamt = 5'b00001}\ninclude SLLI {shamt = 5'b00010}\ninclude SLLI {shamt = 5'b00011}\n\ninclude SRLI {shamt = 5'b00000}\ninclude SRLI {shamt = 5'b00001}\ninclude SRLI {shamt = 5'b00010}\ninclude SRLI {shamt = 5'b00011}\n\ninclude SRAI {shamt = 5'b00000}\ninclude SRAI {shamt = 5'b00001}\ninclude SRAI {shamt = 5'b00010}\ninclude SRAI {shamt = 5'b00011}\n"
+    }
+  }
+}

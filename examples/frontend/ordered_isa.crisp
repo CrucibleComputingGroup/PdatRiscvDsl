@@ -1,0 +1,13 @@
+crisp frontend 1
+backend 2
+context decode = isa
+constraint exclude(op: instruction) at c: isa:
+  at $c: forbid $op
+end
+at decode: include RV32I
+at decode: include RV32M
+use exclude(MUL) at decode
+use exclude(DIV) at decode
+at decode: forbid SLLI
+at decode: forbid x16-x31
+at decode: require_pc_bits 16

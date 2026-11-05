@@ -12,6 +12,11 @@ from pathlib import Path
 
 def main():
     """Main CLI entry point."""
+    if len(sys.argv) > 1 and sys.argv[1] == "frontend":
+        if sys.version_info < (3, 8):
+            raise SystemExit("The checked CRISP frontend requires Python 3.8 or newer")
+        from .frontend_cli import main as frontend_main
+        return frontend_main(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "contract":
         if sys.version_info < (3, 8):
             raise SystemExit("CRISP 3 contracts require Python 3.8 or newer")
@@ -40,6 +45,7 @@ For more information, visit: https://github.com/yourusername/PdatDsl
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
+    subparsers.add_parser("frontend", help="Check reusable constraints and use the existing SVA generator")
     subparsers.add_parser("contract", help="Check/compile typed CRISP 3 contracts (contract --help)")
 
     # Parse command

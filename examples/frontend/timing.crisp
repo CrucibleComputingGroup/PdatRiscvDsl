@@ -1,0 +1,19 @@
+crisp frontend 1
+backend 1
+context decode = isa
+context bus = memory
+
+constraint bounded_stalls(hit: nat, miss: nat) at c: memory:
+  at $c: instr_hit_latency $hit
+  at $c: instr_miss_latency $miss
+  at $c: data_hit_latency $hit
+  at $c: data_miss_latency $miss
+end
+constraint register_subset(regs: registers) at c: isa:
+  at $c: require_registers $regs
+end
+
+at decode: require RV32I
+at decode: require RV32M
+use register_subset(x0-x15) at decode
+use bounded_stalls(1, 4) at bus

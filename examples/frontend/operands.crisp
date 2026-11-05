@@ -1,0 +1,18 @@
+crisp frontend 1
+backend 1
+context execute = alu
+context multiply = multdiv
+
+predicate small(x: bits[W], n: nat) = fits_u(x, n)
+predicate signed_or_unsigned(x: bits[W], n: nat) = fits_s(x, n) or small(x, n)
+
+constraint narrow_alu(op: instruction, n: nat) at c: alu:
+  operand $op.inputs at $c satisfies small(value, $n) lowers ~(u8 | u$n)
+end
+constraint narrow_mult(op: instruction, n: nat) at c: multdiv:
+  operand $op.inputs at $c satisfies signed_or_unsigned(value, $n) lowers ~(i8 | u8 | i$n | u$n)
+end
+
+use narrow_alu(ADD, 16) at execute
+use narrow_alu(SUB, 8) at execute
+use narrow_mult(MUL, 16) at multiply

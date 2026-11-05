@@ -1,0 +1,5 @@
+crisp frontend 1
+backend 1
+context decode = isa
+at decode: instruction SLLI { shamt = 5'b1xxxx }
+at decode: instruction ADD { rs1 = x0, rs2 = x1 }
