@@ -917,12 +917,15 @@ class Parser:
         return PatternRule(pattern_num.value, mask_num.value, None, pattern_tok.line)
 
     def parse_channel_timing_rule(self) -> "ChannelTimingRule":
-        """Parse: response_latency <channel> N  |  grant_latency <channel> N"""
+        """Parse: response_latency <channel> [MIN] MAX  |  grant_latency <channel> N"""
         kind_tok = self.advance()
         channel_tok = self.expect(TokenType.IDENTIFIER)
         value_tok = self.expect(TokenType.NUMBER)
+        lo, hi = 1, value_tok.value
+        if kind_tok.type == TokenType.RESPONSE_LATENCY and self.peek().type == TokenType.NUMBER:
+            lo, hi = value_tok.value, self.advance().value
         return ChannelTimingRule(kind=kind_tok.value, channel=channel_tok.value,
-                                 cycles=value_tok.value, line=kind_tok.line)
+                                 cycles=hi, line=kind_tok.line, min_cycles=lo)
 
     def parse_timing_parameter_rule(self) -> TimingConstraintRule:
         """Parse: instr_hit_latency 1"""

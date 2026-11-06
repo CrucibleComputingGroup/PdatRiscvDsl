@@ -7,8 +7,9 @@ outstanding requests (MSHRs, load buffers, write buffers, transaction tables).
 
 Declarations (CRISP):
 
-    grant_latency    <channel> N   # a raised request is accepted within N cycles
-    response_latency <channel> N   # each accepted request is answered 1..N cycles later
+    grant_latency    <channel> N     # a raised request is accepted within N cycles
+    response_latency <channel> N     # each accepted request is answered 1..N cycles later
+    response_latency <channel> M N   # ... M..N cycles later (M = N: exact latency)
 
 A channel is described in the core configuration under `signals.channels`:
 
@@ -43,6 +44,7 @@ class ChannelTimingRule:
     channel: str
     cycles: int
     line: int = 0
+    min_cycles: int = 1
 
 
 def _bits(n: int) -> int:
@@ -68,7 +70,7 @@ def _grant(name: str, ch: Dict, n: int, clk: str, rst_n: str) -> str:
 """
 
 
-def _response_tagged(name: str, ch: Dict, n: int, clk: str, rst_n: str) -> str:
+def _response_tagged(name: str, ch: Dict, n: int, clk: str, rst_n: str, lo: int = 1) -> str:
     w = _bits(n + 1)
     tw = int(ch["tag_width"])
     v, tag = ch["req_valid"], ch["req_tag"]
@@ -76,9 +78,11 @@ def _response_tagged(name: str, ch: Dict, n: int, clk: str, rst_n: str) -> str:
     rsp_fire = f"{ch['rsp_valid']} && {ch['rsp_ready']}" if "rsp_ready" in ch else ch["rsp_valid"]
     rv, rtag = ch["rsp_valid"], ch["rsp_tag"]
     nt = 1 << tw
+    min_tag = f" && crisp_{name}_age_q[{rtag}] >= {w}'d{lo}" if lo > 1 else ""
+    decl = f"{lo} {n}" if lo > 1 else f"{n}"
     return f"""
-  // CRISP response_latency {name} {n}: every accepted request (tag {tag}) is
-  // answered 1..{n} cycles after acceptance; responses only for outstanding tags
+  // CRISP response_latency {name} {decl}: every accepted request (tag {tag}) is
+  // answered {lo}..{n} cycles after acceptance; responses only for outstanding tags
   logic [{nt-1}:0] crisp_{name}_out_q;
   logic [{w-1}:0] crisp_{name}_age_q [{nt}];
   always_ff @(posedge {clk} or negedge {rst_n}) begin
@@ -101,7 +105,7 @@ def _response_tagged(name: str, ch: Dict, n: int, clk: str, rst_n: str) -> str:
   end
   always_comb begin
     if ({rst_n}) begin
-      if ({rv}) assume (crisp_{name}_out_q[{rtag}]);
+      if ({rv}) assume (crisp_{name}_out_q[{rtag}]{min_tag});
       for (int t = 0; t < {nt}; t++)
         if (crisp_{name}_out_q[t] && crisp_{name}_age_q[t] >= {w}'d{n})
           assume ({rv} && {rtag} == {tw}'(t));
@@ -110,7 +114,7 @@ def _response_tagged(name: str, ch: Dict, n: int, clk: str, rst_n: str) -> str:
 """
 
 
-def _response_inorder(name: str, ch: Dict, n: int, clk: str, rst_n: str) -> str:
+def _response_inorder(name: str, ch: Dict, n: int, clk: str, rst_n: str, lo: int = 1) -> str:
     m = int(ch.get("max_outstanding", 4))
     w = _bits(n + 1)
     cw = _bits(m)
@@ -118,6 +122,8 @@ def _response_inorder(name: str, ch: Dict, n: int, clk: str, rst_n: str) -> str:
     req_fire = f"{v} && {ch['req_ready']}" if "req_ready" in ch else v
     rsp_fire = f"{ch['rsp_valid']} && {ch['rsp_ready']}" if "rsp_ready" in ch else ch["rsp_valid"]
     rv = ch["rsp_valid"]
+    min_head = f" && crisp_{name}_age_q[0] >= {w}'d{lo}" if lo > 1 else ""
+    decl = f"{lo} {n}" if lo > 1 else f"{n}"
     shift = "\n".join(
         f"    if (crisp_{name}_pop) begin\n"
         f"      if ({i + 1} < crisp_{name}_cnt_q) crisp_{name}_age_d[{i}] = crisp_{name}_inc(crisp_{name}_age_q[{i + 1}]);\n"
@@ -126,8 +132,8 @@ def _response_inorder(name: str, ch: Dict, n: int, clk: str, rst_n: str) -> str:
         f"    if (!crisp_{name}_pop && {i} < crisp_{name}_cnt_q) crisp_{name}_age_d[{i}] = crisp_{name}_inc(crisp_{name}_age_q[{i}]);"
         for i in range(m))
     return f"""
-  // CRISP response_latency {name} {n}: in-order responses; every accepted request is
-  // answered 1..{n} cycles after acceptance (the monitor tracks up to {m} outstanding)
+  // CRISP response_latency {name} {decl}: in-order responses; every accepted request is
+  // answered {lo}..{n} cycles after acceptance (the monitor tracks up to {m} outstanding)
   logic [{cw-1}:0] crisp_{name}_cnt_q, crisp_{name}_cnt_d;
   logic [{w-1}:0] crisp_{name}_age_q [{m}];
   logic [{w-1}:0] crisp_{name}_age_d [{m}];
@@ -156,7 +162,7 @@ def _response_inorder(name: str, ch: Dict, n: int, clk: str, rst_n: str) -> str:
   end
   always_comb begin
     if ({rst_n}) begin
-      if ({rv}) assume (crisp_{name}_cnt_q != '0);
+      if ({rv}) assume (crisp_{name}_cnt_q != '0{min_head});
       if (crisp_{name}_cnt_q != '0 && crisp_{name}_age_q[0] >= {w}'d{n}) assume ({rv});
     end
   end
@@ -179,14 +185,14 @@ def generate_channel_timing(rules: List[ChannelTimingRule], config) -> str:
         if rule.kind == "grant_latency":
             code += _grant(rule.channel, ch, rule.cycles, clk, rst_n)
         elif rule.kind == "response_latency":
-            if rule.cycles < 1:
-                raise ValueError(f"line {rule.line}: response_latency must be at least 1")
+            if not 1 <= rule.min_cycles <= rule.cycles:
+                raise ValueError(f"line {rule.line}: response_latency needs 1 <= min <= max")
             if "req_tag" in ch:
                 if "rsp_tag" not in ch or "tag_width" not in ch:
                     raise ValueError(f"channel '{rule.channel}': req_tag requires rsp_tag and tag_width")
-                code += _response_tagged(rule.channel, ch, rule.cycles, clk, rst_n)
+                code += _response_tagged(rule.channel, ch, rule.cycles, clk, rst_n, rule.min_cycles)
             else:
-                code += _response_inorder(rule.channel, ch, rule.cycles, clk, rst_n)
+                code += _response_inorder(rule.channel, ch, rule.cycles, clk, rst_n, rule.min_cycles)
         else:
             raise ValueError(f"unknown channel timing rule {rule.kind}")
     return code

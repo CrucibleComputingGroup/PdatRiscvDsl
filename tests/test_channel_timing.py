@@ -87,3 +87,14 @@ def test_codegen_cli_writes_timing_and_honours_compressed_check(tmp_path):
                    cwd=ROOT, check=True, capture_output=True)
     assert "!= 2'b11" not in out.read_text()                 # no 16-bit exemption without RVC
     assert "crisp_mem_out_q" in (tmp_path / "t_timing.sv").read_text()
+
+
+def test_exact_latency(tmp_path):
+    ast = parse_dsl("version 2\nresponse_latency mem 2 2\nresponse_latency imem 3\n")
+    rules = [r for r in ast.rules if isinstance(r, ChannelTimingRule)]
+    assert [(r.channel, r.min_cycles, r.cycles) for r in rules] == [("mem", 2, 2), ("imem", 1, 3)]
+    code = generate_channel_timing(rules, _config(tmp_path))
+    assert "assume (crisp_mem_out_q[rtag_i] && crisp_mem_age_q[rtag_i] >= 2'd2);" in code
+    assert "if (irvalid_i) assume (crisp_imem_cnt_q != '0);" in code       # default minimum: unchanged text
+    with pytest.raises(ValueError):
+        generate_channel_timing([ChannelTimingRule("response_latency", "mem", 2, min_cycles=3)], _config(tmp_path))
