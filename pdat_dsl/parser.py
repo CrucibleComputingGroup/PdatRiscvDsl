@@ -44,6 +44,9 @@ class TokenType(Enum):
     DATA_HIT_LATENCY = "data_hit_latency"
     DATA_MISS_LATENCY = "data_miss_latency"
     LOCALITY_BITS = "locality_bits"
+    # Per-request interface wait-time bounds (see channel_timing.py)
+    RESPONSE_LATENCY = "response_latency"
+    GRANT_LATENCY = "grant_latency"
 
     # Literals
     IDENTIFIER = "identifier"
@@ -399,6 +402,9 @@ class PatternRule:
     description: Optional[str]
     line: int
 
+from .channel_timing import ChannelTimingRule  # noqa: E402
+
+
 @dataclass
 class TimingConstraintRule:
     """Timing constraint rule like 'instr_hit_latency 1'"""
@@ -588,6 +594,10 @@ class Lexer:
             return Token(TokenType.DATA_MISS_LATENCY, ident, start_line, start_col)
         elif ident == "locality_bits":
             return Token(TokenType.LOCALITY_BITS, ident, start_line, start_col)
+        elif ident == "response_latency":
+            return Token(TokenType.RESPONSE_LATENCY, ident, start_line, start_col)
+        elif ident == "grant_latency":
+            return Token(TokenType.GRANT_LATENCY, ident, start_line, start_col)
         # Check if it's a data type (i8, u16, i32, u64, etc.)
         elif self._is_data_type(ident):
             return Token(TokenType.DTYPE, ident, start_line, start_col)
@@ -797,6 +807,8 @@ class Parser:
                          TokenType.DATA_HIT_LATENCY, TokenType.DATA_MISS_LATENCY,
                          TokenType.LOCALITY_BITS):
             return self.parse_timing_parameter_rule()
+        elif tok.type in (TokenType.RESPONSE_LATENCY, TokenType.GRANT_LATENCY):
+            return self.parse_channel_timing_rule()
         else:
             self.error(f"Expected 'version', 'include', 'forbid', 'require', 'require_registers', 'require_pc_bits', 'allow', 'instruction', 'timing parameter' or 'pattern', got {tok.type}")
 
@@ -903,6 +915,14 @@ class Parser:
         # We can't easily get it here, so leave as None for now
 
         return PatternRule(pattern_num.value, mask_num.value, None, pattern_tok.line)
+
+    def parse_channel_timing_rule(self) -> "ChannelTimingRule":
+        """Parse: response_latency <channel> N  |  grant_latency <channel> N"""
+        kind_tok = self.advance()
+        channel_tok = self.expect(TokenType.IDENTIFIER)
+        value_tok = self.expect(TokenType.NUMBER)
+        return ChannelTimingRule(kind=kind_tok.value, channel=channel_tok.value,
+                                 cycles=value_tok.value, line=kind_tok.line)
 
     def parse_timing_parameter_rule(self) -> TimingConstraintRule:
         """Parse: instr_hit_latency 1"""

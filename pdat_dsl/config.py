@@ -73,6 +73,10 @@ CORE_CONFIG_SCHEMA = {
                     "description": "Whether instruction signal has bits [1:0] for compressed check (default: true)",
                     "default": True
                 },
+                "channels": {
+                    "type": "object",
+                    "description": "Named request/response channels for response_latency/grant_latency"
+                },
                 "operands": {
                     "type": "object",
                     "description": "Operand signal names by execution unit",
@@ -261,6 +265,9 @@ class SignalConfig:
     data_gnt: str = "data_gnt_i"
     data_rvalid: str = "data_rvalid_i"
 
+    # Named request/response channels for per-request wait-time bounds
+    channels: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> 'SignalConfig':
         """Create SignalConfig from dictionary (loaded from YAML)."""
@@ -292,6 +299,9 @@ class SignalConfig:
                     signals.multdiv_rs1 = operands['multdiv']['rs1']
                 if 'rs2' in operands['multdiv']:
                     signals.multdiv_rs2 = operands['multdiv']['rs2']
+
+        if 'channels' in d:
+            signals.channels = dict(d['channels'])
 
         # Handle memory interface signals (optional - for timing constraints)
         if 'memory' in d:

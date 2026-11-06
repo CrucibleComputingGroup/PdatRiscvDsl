@@ -1198,9 +1198,13 @@ def generate_inline_assumptions_from_aig_db(db, config: Optional[CoreConfig] = N
     code += f"  wire [4:0] instr_rs1 = {instr_data}[19:15];\n"
     code += f"  wire [4:0] instr_rs2 = {instr_data}[24:20];\n\n"
 
-    # Generate OR of all instruction constraints
+    # Generate OR of all instruction constraints. Only cores with compressed
+    # instructions exempt 16-bit encodings (bits [1:0] != 11) from this check.
     code += "  always_comb begin\n"
-    code += f"    assume (!{rst_n} || ({instr_data}[1:0] != 2'b11) || (\n"
+    if config.signals.has_compressed_check:
+        code += f"    assume (!{rst_n} || ({instr_data}[1:0] != 2'b11) || (\n"
+    else:
+        code += f"    assume (!{rst_n} || (\n"
 
     constraint_exprs = []
     for instr_name, constraint in sorted(db.constraints.items()):
@@ -1734,6 +1738,7 @@ def main():
                 f.write(timing_code)
             print(f"Successfully wrote timing constraints to {timing_output}")
 
+        _write_channel_timing(ast, config, args.output_file)
         return  # Exit early for v2
 
     # V1: Original outlawing semantics (rest of function unchanged)
@@ -1832,6 +1837,21 @@ def main():
         with open(timing_output, 'w') as f:
             f.write(timing_code)
         print(f"Successfully wrote timing constraints to {timing_output}")
+
+    _write_channel_timing(ast, config, args.output_file)
+
+
+def _write_channel_timing(ast, config, output_file):
+    """Append per-request interface wait-time monitors to <output>_timing.sv."""
+    from .channel_timing import ChannelTimingRule, generate_channel_timing
+    rules = [r for r in ast.rules if isinstance(r, ChannelTimingRule)]
+    if not rules:
+        return
+    code = generate_channel_timing(rules, config)
+    out = output_file[:-3] + '_timing.sv' if output_file.endswith('.sv') else output_file + '_timing.sv'
+    with open(out, 'a') as f:
+        f.write(code)
+    print(f"Successfully wrote {len(rules)} channel timing rule(s) to {out}")
 
 
 if __name__ == '__main__':
